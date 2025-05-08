@@ -32,21 +32,27 @@ async function getServiceInstance(): Promise<IDataService> {
       process.env.POSTGRES_CONNECTION_STRING;
 
     if (!hasFullPostgresConfig) {
-      const errorMessage = "Server-side: dataSourceType is 'postgres', but PostgreSQL environment variables (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB) or POSTGRES_CONNECTION_STRING are not fully set. Halting.";
+      const errorMessage = "Server-side Error: dataSourceType is 'postgres', but PostgreSQL environment variables (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB) or POSTGRES_CONNECTION_STRING are not fully set. Halting.";
       console.error(errorMessage);
       throw new Error(errorMessage);
     }
     try {
+      console.log("Server-side: Attempting to import PostgresDataService module...");
       const PgModule = await import('./postgres-data-service');
-      const PostgresDataServiceClass = PgModule.PostgresDataService; // Simplified
+      console.log("Server-side: PostgresDataService module imported successfully.");
+      
+      const PostgresDataServiceClass = PgModule.PostgresDataService;
       if (!PostgresDataServiceClass || typeof PostgresDataServiceClass !== 'function') {
-        console.error("Failed to resolve PostgresDataService class from module. Expected a named export 'PostgresDataService'. Module content:", PgModule);
+        console.error("Server-side Error: PostgresDataService class not found or is not a constructor in the imported module. Module content:", PgModule);
         throw new Error("PostgresDataService class not found or is not a constructor in module.");
       }
-      console.log("Server-side: Using PostgresDataService.");
-      return new PostgresDataServiceClass();
+      
+      console.log("Server-side: Instantiating PostgresDataService.");
+      const serviceInstance = new PostgresDataServiceClass();
+      console.log("Server-side: PostgresDataService instantiated successfully.");
+      return serviceInstance;
     } catch (error) {
-      console.error("Server-side: Failed to initialize PostgresDataService. This could be due to incorrect connection details, database accessibility (firewall, network), missing schema (tables 'categories', 'links'), or an issue with the 'pg' driver in the Vercel environment. Please verify your Vercel environment variables and database setup. Original error:", error);
+      console.error("Server-side CRITICAL: Failed to initialize or instantiate PostgresDataService. This could be due to issues with the module import, class definition, constructor errors (e.g., connection issues, missing 'pg' driver), or other runtime problems. Please verify your Vercel environment variables, database setup, and check server logs for details from PostgresDataService constructor. Original error:", error);
       throw error; 
     }
   } else if (dataSourceType === 'mongodb') {
@@ -57,27 +63,30 @@ async function getServiceInstance(): Promise<IDataService> {
       throw new Error(errorMessage);
     }
     try {
+      console.log("Server-side: Attempting to import MongoDataService module...");
       const MongoModule = await import('./mongo-data-service');
-      const MongoDataServiceClass = MongoModule.MongoDataService; // Simplified
+      console.log("Server-side: MongoDataService module imported successfully.");
+
+      const MongoDataServiceClass = MongoModule.MongoDataService;
        if (!MongoDataServiceClass || typeof MongoDataServiceClass !== 'function') {
-        console.error("Failed to resolve MongoDataService class from module. Expected a named export 'MongoDataService'. Module content:", MongoModule);
+        console.error("Server-side Error: MongoDataService class not found or is not a constructor in the imported module. Module content:", MongoModule);
         throw new Error("MongoDataService class not found or is not a constructor in module.");
       }
-      console.log("Server-side: Using MongoDataService.");
-      return new MongoDataServiceClass();
+      console.log("Server-side: Instantiating MongoDataService.");
+      const serviceInstance = new MongoDataServiceClass();
+      console.log("Server-side: MongoDataService instantiated successfully.");
+      return serviceInstance;
     } catch (error) {
-      console.error("Server-side: Failed to initialize MongoDataService. This could be due to incorrect connection details, database accessibility (firewall, network), or replica set configuration issues for transactions. Please verify your Vercel environment variables and database setup. Original error:", error);
+       console.error("Server-side CRITICAL: Failed to initialize or instantiate MongoDataService. Original error:", error);
       throw error; 
     }
   } else { 
     console.log("Server-side: Using LocalDataService (for server-side operations in local mode).");
-    // This path should ideally only be taken if NEXT_PUBLIC_DATA_SOURCE_TYPE is explicitly 'local' or undefined for server operations.
-    // For server-side 'local' mode, LocalDataService is designed to use in-memory defaults.
     const LocalDataServiceModule = await import('./local-data-service');
     const LocalDataServiceClass = LocalDataServiceModule.LocalDataService;
     
     if (!LocalDataServiceClass || typeof LocalDataServiceClass !== 'function') {
-      console.error("Server-side: Failed to resolve LocalDataService class from module for 'local' mode. Module content:", LocalDataServiceModule);
+      console.error("Server-side Error: LocalDataService class not found or is not a constructor in module for 'local' mode. Module content:", LocalDataServiceModule);
       throw new Error("LocalDataService class not found or is not a constructor in module for server-side 'local' mode.");
     }
     return new LocalDataServiceClass();
@@ -131,4 +140,3 @@ export const deleteLink = async (id: string): Promise<boolean> => {
   const service = await getServiceInstance();
   return service.deleteLink(id);
 };
-
