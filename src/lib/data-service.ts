@@ -22,7 +22,7 @@ let dataServiceInstance: IDataService;
 
 function initializeDataService(): IDataService {
   if (dataSourceType === 'postgres') {
-    if (!isBrowser && PostgresDataServiceModule) { // Only attempt to initialize on server AND if module is loaded
+    if (!isBrowser && PostgresDataServiceModule && typeof PostgresDataServiceModule.PostgresDataService === 'function') { // Only attempt to initialize on server AND if module is loaded AND if the constructor exists
       try {
         // Check for necessary PostgreSQL environment variables
         if (
@@ -86,3 +86,4 @@ export const getLink = (id: string): Promise<LinkItem | undefined> => dataServic
 export const addLink = (link: Omit<LinkItem, "id">): Promise<LinkItem> => dataServiceInstance.addLink(link);
 export const updateLink = (updatedLink: LinkItem): Promise<LinkItem | null> => dataServiceInstance.updateLink(updatedLink);
 export const deleteLink = (id: string): Promise<boolean> => dataServiceInstance.deleteLink(id);
+
