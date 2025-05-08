@@ -1,4 +1,3 @@
-
 "use client";
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
@@ -23,6 +22,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   const applyTheme = useCallback((scheme: ThemeScheme, mode: ThemeMode) => {
     const root = window.document.documentElement;
+    // Remove all potentially existing theme classes
     root.classList.remove(
       'light', 'dark', 
       'theme-purple-bliss', 'theme-classic-teal', 'theme-forest-whisper', 
@@ -36,16 +36,20 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       currentMode = mode;
     }
     
+    // Add the current mode class (light or dark)
     root.classList.add(currentMode);
     setEffectiveMode(currentMode);
 
-    if (scheme !== 'classic-teal' || (scheme === 'classic-teal' && currentMode === 'dark')) { // classic-teal light is the :root default
-        root.classList.add(scheme === 'classic-teal' ? `theme-${scheme}` : `theme-${scheme}`);
+    // Add the scheme class if:
+    // 1. The scheme is NOT 'classic-teal' (meaning it's any other theme like purple-bliss, forest-whisper etc.)
+    // OR
+    // 2. The scheme IS 'classic-teal' AND the currentMode is 'dark'.
+    // This ensures that 'classic-teal' in light mode does not get a specific theme class,
+    // allowing it to use the default :root styles defined in globals.css.
+    // All other themes, or 'classic-teal' in dark mode, will get their specific theme class.
+    if (scheme !== 'classic-teal' || (scheme === 'classic-teal' && currentMode === 'dark')) {
+        root.classList.add(`theme-${scheme}`);
     }
-     if (scheme !== 'classic-teal') {
-      root.classList.add(`theme-${scheme}`);
-    }
-
 
     localStorage.setItem('themeScheme', scheme);
     localStorage.setItem('themeMode', mode);
@@ -60,14 +64,17 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     
     setThemeScheme(initialScheme);
     setThemeModeState(initialMode);
-    applyTheme(initialScheme, initialMode);
-  }, [applyTheme]);
+    // Initial application of theme based on stored or default values
+    // This will also set effectiveMode correctly via applyTheme
+  }, []); // Removed applyTheme from dependency array to avoid double call on init
 
   useEffect(() => {
+    // This effect runs whenever themeScheme or themeMode (or initial values from above useEffect) change
     applyTheme(themeScheme, themeMode);
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
+      // If themeMode is 'system', re-apply theme to reflect system change
       if (themeMode === 'system') {
         applyTheme(themeScheme, 'system');
       }
@@ -78,7 +85,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
-    applyTheme(themeScheme, mode);
+    // applyTheme(themeScheme, mode); // This will be handled by the useEffect above which observes themeMode changes
   };
 
 
