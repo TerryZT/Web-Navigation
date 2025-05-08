@@ -4,9 +4,24 @@ import React from 'react';
 
 const Logo: React.FC = () => {
   return (
-    <div className="flex flex-col md:flex-row items-center md:items-baseline my-8 select-none" data-ai-hint="kids education logo">
-      {/* Block 1: K T Erin */}
-      <div className="flex flex-col items-center mb-4 md:mb-0 md:mr-4">
+    // Main container:
+    // - On small screens (flex-col): Text block (Block 2) appears above KT Erin block (Block 1).
+    // - On md screens and up (md:flex-row): Text block (Block 2) is to the left of KT Erin block (Block 1).
+    // - items-center for vertical alignment on both small and md+ screens.
+    <div className="flex flex-col md:flex-row items-center my-8 select-none" data-ai-hint="kids education logo">
+      
+      {/* Block 2: 全科启蒙 / 0-12岁 (Text part - now on the left for md screens) */}
+      <div className="flex flex-col items-center text-center md:items-start md:text-left mb-4 md:mb-0 md:mr-6">
+        <div className="text-4xl font-bold text-foreground">
+          全科启蒙
+        </div>
+        <div className="text-base text-muted-foreground tracking-wider mt-1"> {/* Font size increased from text-sm to text-base */}
+          0-12岁
+        </div>
+      </div>
+
+      {/* Block 1: K T Erin (Image/Icon part - now on the right for md screens) */}
+      <div className="flex flex-col items-center">
         {/* Row 1.1: K, Smiley, T */}
         <div className="flex items-end space-x-1">
           <div className="flex items-center justify-center w-12 h-12 bg-red-500 text-white text-3xl font-bold rounded-lg transform -rotate-6">
@@ -30,15 +45,6 @@ const Logo: React.FC = () => {
         </div>
       </div>
 
-      {/* Block 2: 全科启蒙 / 0-12岁 */}
-      <div className="flex flex-col items-center md:ml-2">
-        <div className="text-4xl font-bold text-foreground">
-          全科启蒙
-        </div>
-        <div className="text-sm text-muted-foreground tracking-wider mt-1">
-          0-12岁
-        </div>
-      </div>
     </div>
   );
 };
