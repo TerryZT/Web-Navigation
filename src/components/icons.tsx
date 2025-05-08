@@ -1,9 +1,11 @@
+
 "use client";
 import type { LucideProps } from 'lucide-react';
 import {
   Home, Briefcase, BookOpen, Code, Settings, Link as LinkIconLucide, Folder, FileText,
   Zap, Palette, Github, AlertTriangle, CheckCircle, Info, XCircle, Trash2, Edit3, PlusCircle,
-  Search, Users, ShoppingCart, Film, Globe, ExternalLink, ChevronDown, ChevronRight, Menu, LogOut, Eye, EyeOff
+  Search, Users, ShoppingCart, Film, Globe, ExternalLink, ChevronDown, ChevronRight, Menu, LogOut, Eye, EyeOff,
+  Moon, Sun // Added Moon and Sun icons
 } from 'lucide-react';
 
 // Add any new icons here
@@ -38,6 +40,8 @@ export const iconMap: Record<string, React.ElementType<LucideProps>> = {
   LogOut,
   Eye,
   EyeOff,
+  Moon, // Added Moon
+  Sun,  // Added Sun
   Default: LinkIconLucide, // Fallback icon
 };
 
