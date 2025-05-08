@@ -16,7 +16,7 @@ interface ThemeContextProps {
 const ThemeContext = createContext<ThemeContextProps | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [themeScheme, setThemeScheme] = useState<ThemeScheme>('purple-bliss');
+  const [themeScheme, setThemeSchemeState] = useState<ThemeScheme>('purple-bliss');
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
   const [effectiveMode, setEffectiveMode] = useState<'light' | 'dark'>('light');
 
@@ -57,7 +57,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     const initialScheme = storedScheme || 'purple-bliss';
     const initialMode = storedMode || 'system';
     
-    setThemeScheme(initialScheme);
+    setThemeSchemeState(initialScheme);
     setThemeModeState(initialMode);
     // Initial application of theme based on stored or default values
     // This will also set effectiveMode correctly via applyTheme
@@ -77,6 +77,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [themeScheme, themeMode, applyTheme]);
+
+  const setThemeScheme = (scheme: ThemeScheme) => {
+    setThemeSchemeState(scheme);
+  }
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
@@ -98,3 +102,4 @@ export const useTheme = () => {
   }
   return context;
 };
+
