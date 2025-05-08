@@ -1,9 +1,9 @@
-
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import type { Category, LinkItem } from '@/types';
-import { getCategories as getCategoriesServer, getLinksByCategoryId as getLinksByCategoryIdServer } from '@/lib/data-service'; // Server actions
-import { getClientLocalDataService } from '@/lib/client-local-data-service'; // Client-side service
+// Import new server actions for the public page
+import { getPublicPageCategories, getPublicPageLinksByCategoryId } from './actions'; 
+import { getClientLocalDataService } from '@/lib/client-local-data-service';
 import type { IDataService } from '@/lib/data-service-interface';
 
 import AppHeader from '@/components/layout/AppHeader';
@@ -24,8 +24,8 @@ function getEffectiveDataService(): IDataService {
   // For non-local modes, return an object that calls the server actions
   console.log("Public Page: Using Server Actions for data");
   return {
-    getCategories: getCategoriesServer,
-    getLinksByCategoryId: getLinksByCategoryIdServer,
+    getCategories: getPublicPageCategories, // Use specific server action
+    getLinksByCategoryId: getPublicPageLinksByCategoryId, // Use specific server action
     // Dummy implementations for other IDataService methods not used by this page
     getCategory: async (id: string) => { console.warn("getCategory called on server action stub from public page"); return undefined; },
     addCategory: async (category) => { console.warn("addCategory called on server action stub from public page"); throw new Error("Not implemented on stub"); },
@@ -169,4 +169,3 @@ export default function HomePage() {
     </div>
   );
 }
-
