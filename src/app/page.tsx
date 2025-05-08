@@ -1,8 +1,10 @@
-
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import type { Category, LinkItem } from '@/types';
-import { getCategories, getLinksByCategoryId } from '@/lib/data-service';
+import { getCategories as getCategoriesServer, getLinksByCategoryId as getLinksByCategoryIdServer } from '@/lib/data-service'; // Server actions
+import { getClientLocalDataService } from '@/lib/client-local-data-service'; // Client-side service
+import type { IDataService } from '@/lib/data-service-interface';
+
 import AppHeader from '@/components/layout/AppHeader';
 import AppFooter from '@/components/layout/AppFooter';
 import CategorySection from '@/components/links/CategorySection';
@@ -10,6 +12,30 @@ import Logo from '@/components/layout/Logo';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from '@/hooks/use-toast';
+
+const IS_LOCAL_STORAGE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE === 'local' || !process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE;
+
+function getEffectiveDataService(): IDataService {
+  if (IS_LOCAL_STORAGE_MODE) {
+    return getClientLocalDataService();
+  }
+  // For non-local modes, return an object that calls the server actions
+  return {
+    getCategories: getCategoriesServer,
+    getLinksByCategoryId: getLinksByCategoryIdServer,
+    // Dummy implementations for other IDataService methods not used by this page
+    getCategory: async (id: string) => { console.warn("getCategory called on server action stub from public page"); return undefined; },
+    addCategory: async (category) => { console.warn("addCategory called on server action stub from public page"); throw new Error("Not implemented on stub"); },
+    updateCategory: async (category) => { console.warn("updateCategory called on server action stub from public page"); throw new Error("Not implemented on stub"); },
+    deleteCategory: async (id: string) => { console.warn("deleteCategory called on server action stub from public page"); return false; },
+    getLinks: async () => { console.warn("getLinks called on server action stub from public page"); return []; },
+    getLink: async (id: string) => { console.warn("getLink called on server action stub from public page"); return undefined; },
+    addLink: async (link) => { console.warn("addLink called on server action stub from public page"); throw new Error("Not implemented on stub"); },
+    updateLink: async (link) => { console.warn("updateLink called on server action stub from public page"); throw new Error("Not implemented on stub"); },
+    deleteLink: async (id: string) => { console.warn("deleteLink called on server action stub from public page"); return false; },
+  };
+}
+
 
 export default function HomePage() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
@@ -24,14 +50,15 @@ export default function HomePage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    const service = getEffectiveDataService();
     try {
-      const fetchedCategories = await getCategories();
+      const fetchedCategories = await service.getCategories();
       setAllCategories(fetchedCategories);
 
       const newLinksMap: Record<string, LinkItem[]> = {};
       // Fetch links for all categories in parallel
       await Promise.all(fetchedCategories.map(async (category) => {
-        newLinksMap[category.id] = await getLinksByCategoryId(category.id);
+        newLinksMap[category.id] = await service.getLinksByCategoryId(category.id);
       }));
       setAllLinksMap(newLinksMap);
 
@@ -137,4 +164,3 @@ export default function HomePage() {
     </div>
   );
 }
-

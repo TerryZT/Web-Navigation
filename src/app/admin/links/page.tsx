@@ -27,8 +27,35 @@ import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+
 import { getLinksAction, addLinkAction, deleteLinkAction, updateLinkAction } from './actions';
-import { getCategoriesAction } from '../categories/actions';
+import { getCategoriesAction as getCategoriesServerAction } from '../categories/actions'; // Renamed to avoid conflict
+import { getClientLocalDataService } from '@/lib/client-local-data-service';
+import type { IDataService } from '@/lib/data-service-interface';
+
+const IS_LOCAL_STORAGE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE === 'local' || !process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE;
+
+function getEffectiveDataService(): IDataService {
+  if (IS_LOCAL_STORAGE_MODE) {
+    return getClientLocalDataService();
+  }
+  // For non-local modes, return an object that calls the server actions
+  return {
+    getLinks: getLinksAction,
+    addLink: addLinkAction,
+    updateLink: updateLinkAction,
+    deleteLink: deleteLinkAction,
+    getCategories: getCategoriesServerAction, // Use the server action for categories
+    // Dummy implementations for other IDataService methods not used by this page
+    getLinksByCategoryId: async (categoryId: string) => { console.warn("getLinksByCategoryId called on server action stub"); return []; },
+    getLink: async (id: string) => { console.warn("getLink called on server action stub"); return undefined; },
+    getCategory: async (id: string) => { console.warn("getCategory called on server action stub"); return undefined; },
+    addCategory: async (category) => { console.warn("addCategory called on server action stub"); throw new Error("Not implemented on stub"); },
+    updateCategory: async (category) => { console.warn("updateCategory called on server action stub"); throw new Error("Not implemented on stub"); },
+    deleteCategory: async (id: string) => { console.warn("deleteCategory called on server action stub"); return false; },
+  };
+}
+
 
 export default function LinksPage() {
   const [links, setLinks] = useState<LinkItem[]>([]);
@@ -43,9 +70,10 @@ export default function LinksPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const service = getEffectiveDataService();
       const [fetchedLinks, fetchedCategories] = await Promise.all([
-        getLinksAction(),
-        getCategoriesAction()
+        service.getLinks(),
+        service.getCategories() // This will use clientLocal.getCategories or categoriesServerAction
       ]);
       setLinks(fetchedLinks);
       setCategories(fetchedCategories);
@@ -63,8 +91,10 @@ export default function LinksPage() {
     if (action === 'add') {
       setIsFormOpen(true);
       setEditingLink(undefined);
-      const currentPathname = window.location.pathname;
-      window.history.replaceState({}, '', currentPathname);
+      if (typeof window !== 'undefined') {
+        const currentPathname = window.location.pathname;
+        window.history.replaceState({}, '', currentPathname);
+      }
     }
   }, [fetchData, searchParams]);
 
@@ -94,7 +124,8 @@ export default function LinksPage() {
   const confirmDelete = async () => {
     if (isDeleting) {
       try {
-        const success = await deleteLinkAction(isDeleting.id);
+        const service = getEffectiveDataService();
+        const success = await service.deleteLink(isDeleting.id);
         if (success) {
           await fetchData();
           toast({ title: "Link Deleted", description: `Link "${isDeleting.title}" has been deleted.` });
@@ -111,16 +142,17 @@ export default function LinksPage() {
   };
 
   const handleSubmitForm = async (values: Omit<LinkItem, 'id'> & { id?: string }) => {
+    const service = getEffectiveDataService();
     try {
       if (editingLink) {
-        const updated = await updateLinkAction({ ...editingLink, ...values });
+        const updated = await service.updateLink({ ...editingLink, ...values } as LinkItem); // Ensure ID is present
         if (updated) {
           toast({ title: "Link Updated", description: `Link "${updated.title}" has been updated.` });
         } else {
           toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
         }
       } else {
-        const newL = await addLinkAction(values);
+        const newL = await service.addLink(values);
         toast({ title: "Link Added", description: `Link "${newL.title}" has been added.` });
       }
       await fetchData();

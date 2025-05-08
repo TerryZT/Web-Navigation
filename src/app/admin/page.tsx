@@ -1,30 +1,56 @@
-
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getCategories, getLinks } from '@/lib/data-service';
+import { getCategories as getCategoriesServer, getLinks as getLinksServer } from '@/lib/data-service'; // Server actions
+import { getClientLocalDataService } from '@/lib/client-local-data-service'; // Client-side service
+import type { IDataService } from '@/lib/data-service-interface';
+
 import IconComponent from '@/components/icons';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+import { Skeleton } from '@/components/ui/skeleton'; 
+
+const IS_LOCAL_STORAGE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE === 'local' || !process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE;
+
+function getEffectiveDataService(): IDataService {
+  if (IS_LOCAL_STORAGE_MODE) {
+    return getClientLocalDataService();
+  }
+  // For non-local modes, return an object that calls the server actions
+  return {
+    getCategories: getCategoriesServer,
+    getLinks: getLinksServer,
+    // Dummy implementations for other IDataService methods not used by this page
+    getLinksByCategoryId: async (categoryId: string) => { console.warn("getLinksByCategoryId called on server action stub from admin dashboard"); return []; },
+    getLink: async (id: string) => { console.warn("getLink called on server action stub from admin dashboard"); return undefined; },
+    getCategory: async (id: string) => { console.warn("getCategory called on server action stub from admin dashboard"); return undefined; },
+    addCategory: async (category) => { console.warn("addCategory called on server action stub from admin dashboard"); throw new Error("Not implemented on stub"); },
+    updateCategory: async (category) => { console.warn("updateCategory called on server action stub from admin dashboard"); throw new Error("Not implemented on stub"); },
+    deleteCategory: async (id: string) => { console.warn("deleteCategory called on server action stub from admin dashboard"); return false; },
+    addLink: async (link) => { console.warn("addLink called on server action stub from admin dashboard"); throw new Error("Not implemented on stub"); },
+    updateLink: async (link) => { console.warn("updateLink called on server action stub from admin dashboard"); throw new Error("Not implemented on stub"); },
+    deleteLink: async (id: string) => { console.warn("deleteLink called on server action stub from admin dashboard"); return false; },
+  };
+}
+
 
 export default function AdminDashboardPage() {
   const [categoryCount, setCategoryCount] = useState(0);
   const [linkCount, setLinkCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchCounts = useCallback(async () => {
     setIsLoading(true);
+    const service = getEffectiveDataService();
     try {
       const [categories, links] = await Promise.all([
-        getCategories(),
-        getLinks(),
+        service.getCategories(),
+        service.getLinks(),
       ]);
       setCategoryCount(categories.length);
       setLinkCount(links.length);
     } catch (error) {
       console.error("Failed to fetch counts:", error);
-      // Optionally set counts to 0 or show an error message
       setCategoryCount(0);
       setLinkCount(0);
     } finally {

@@ -27,6 +27,31 @@ import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCategoriesAction, addCategoryAction, deleteCategoryAction, updateCategoryAction } from './actions';
+import { getClientLocalDataService } from '@/lib/client-local-data-service';
+import type { IDataService } from '@/lib/data-service-interface';
+
+const IS_LOCAL_STORAGE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE === 'local' || !process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE;
+
+function getEffectiveDataService(): IDataService {
+  if (IS_LOCAL_STORAGE_MODE) {
+    return getClientLocalDataService();
+  }
+  return {
+    getCategories: getCategoriesAction,
+    addCategory: addCategoryAction,
+    updateCategory: updateCategoryAction,
+    deleteCategory: deleteCategoryAction,
+    // Dummy implementations for other IDataService methods not used by this page
+    getCategory: async (id: string) => { console.warn("getCategory called on server action stub"); return undefined; },
+    getLinks: async () => { console.warn("getLinks called on server action stub"); return []; },
+    getLinksByCategoryId: async (id: string) => { console.warn("getLinksByCategoryId called on server action stub"); return []; },
+    getLink: async (id: string) => { console.warn("getLink called on server action stub"); return undefined; },
+    addLink: async (link) => { console.warn("addLink called on server action stub"); throw new Error("Not implemented on stub"); },
+    updateLink: async (link) => { console.warn("updateLink called on server action stub"); throw new Error("Not implemented on stub"); },
+    deleteLink: async (id: string) => { console.warn("deleteLink called on server action stub"); return false; },
+  };
+}
+
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,11 +62,15 @@ export default function CategoriesPage() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
+  
+  // dataService instance will be resolved based on mode within functions
+  // No need to store it in state if getEffectiveDataService is cheap (which it is)
 
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedCategories = await getCategoriesAction();
+      const service = getEffectiveDataService();
+      const fetchedCategories = await service.getCategories();
       setCategories(fetchedCategories);
     } catch (error) {
       console.error("Failed to fetch categories:", error);
@@ -57,8 +86,11 @@ export default function CategoriesPage() {
     if (action === 'add') {
       setIsFormOpen(true);
       setEditingCategory(undefined);
-      const currentPathname = window.location.pathname;
-      window.history.replaceState({}, '', currentPathname);
+      // Clean the URL query param
+      if (typeof window !== 'undefined') {
+        const currentPathname = window.location.pathname;
+        window.history.replaceState({}, '', currentPathname);
+      }
     }
   }, [fetchCategories, searchParams]);
 
@@ -79,9 +111,10 @@ export default function CategoriesPage() {
   const confirmDelete = async () => {
     if (isDeleting) {
       try {
-        const success = await deleteCategoryAction(isDeleting.id);
+        const service = getEffectiveDataService();
+        const success = await service.deleteCategory(isDeleting.id);
         if (success) {
-          await fetchCategories();
+          await fetchCategories(); // Refetch to update list
           toast({ title: "Category Deleted", description: `Category "${isDeleting.name}" has been deleted.` });
         } else {
           toast({ title: "Error", description: "Failed to delete category.", variant: "destructive" });
@@ -96,19 +129,20 @@ export default function CategoriesPage() {
   };
 
   const handleSubmitForm = async (values: Omit<Category, 'id'> & { id?: string }) => {
+    const service = getEffectiveDataService();
     try {
       if (editingCategory) {
-        const updated = await updateCategoryAction({ ...editingCategory, ...values });
+        const updated = await service.updateCategory({ ...editingCategory, ...values } as Category); // Ensure ID is present
         if (updated) {
           toast({ title: "Category Updated", description: `Category "${updated.name}" has been updated.` });
         } else {
           toast({ title: "Error", description: "Failed to update category.", variant: "destructive" });
         }
       } else {
-        const newCat = await addCategoryAction(values);
+        const newCat = await service.addCategory(values);
         toast({ title: "Category Added", description: `Category "${newCat.name}" has been added.` });
       }
-      await fetchCategories();
+      await fetchCategories(); // Refetch to update list
       setIsFormOpen(false);
       setEditingCategory(undefined);
     } catch (error) {
@@ -216,4 +250,3 @@ export default function CategoriesPage() {
     </Card>
   );
 }
-
