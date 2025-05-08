@@ -92,10 +92,10 @@ export default function HomePage() {
         <div className="flex flex-col items-center mb-12">
           <Logo />
           <h1 className="text-5xl font-bold text-foreground mt-8">Hello</h1>
-          <p className="text-xl text-primary mt-4">
+          <p className="text-3xl text-primary mt-4">
             Welcome to All-Subject English Enlightenment
           </p>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-lg text-muted-foreground mt-2">
             系统 (平台) 由 Erin 全科英语启蒙团队独立开发完成
           </p>
           <div className="mt-8 w-full max-w-lg">
@@ -137,3 +137,4 @@ export default function HomePage() {
     </div>
   );
 }
+
