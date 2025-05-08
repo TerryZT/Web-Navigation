@@ -1,5 +1,6 @@
 
 import type {NextConfig} from 'next';
+import path from 'path'; // Import path module
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -29,11 +30,17 @@ const nextConfig: NextConfig = {
       // Provide fallbacks for Node.js core modules that are not available in the browser
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        child_process: false,
+        // child_process: false, // Using alias instead for more forceful mocking
         fs: false,
         net: false,
         tls: false,
       };
+      // Use alias for child_process to ensure it's mocked effectively on the client
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'child_process': path.resolve(__dirname, 'src/lib/empty-mock.js'),
+      };
+
     }
 
     // Ignore optional MongoDB dependencies that are not needed and cause build issues
@@ -98,11 +105,28 @@ const nextConfig: NextConfig = {
             resourceRegExp: /^pg-cloudflare$/,
           })
         );
+     config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^socks$/,
+      })
+    );
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^aws4$/,
+      })
+    );
+     config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^pg-native$/,
+      })
+    );
+
 
     return config;
   },
 };
 
 export default nextConfig;
+
 
 

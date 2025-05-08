@@ -1,11 +1,11 @@
-
 import type { Category, LinkItem } from "@/types";
 import type { IDataService } from './data-service-interface';
 
 // Conditional imports for server-side services. These will be dynamically imported.
-let PostgresDataServiceModule: typeof import('./postgres-data-service');
-let MongoDataServiceModule: typeof import('./mongo-data-service');
-let LocalDataServiceModule: typeof import('./local-data-service'); // For server-side local
+// No longer need module-level variables for these:
+// let PostgresDataServiceModule: typeof import('./postgres-data-service');
+// let MongoDataServiceModule: typeof import('./mongo-data-service');
+// let LocalDataServiceModule: typeof import('./local-data-service'); // For server-side local
 
 const dataSourceType = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE || 'local';
 
@@ -24,7 +24,6 @@ async function getServiceInstance(): Promise<IDataService> {
   }
 
   // Server-side logic:
-  // No caching of serverServiceInstance for now, to ensure env vars are read freshly.
   console.log(`Server-side: Initializing data service for type: ${dataSourceType}`);
 
   if (dataSourceType === 'postgres') {
@@ -42,12 +41,18 @@ async function getServiceInstance(): Promise<IDataService> {
       throw new Error(errorMessage);
     }
     try {
-      PostgresDataServiceModule = await import('./postgres-data-service');
+      const PgModule = await import('./postgres-data-service');
+      // Robustly try to get the class constructor
+      const PostgresDataServiceClass = PgModule.PostgresDataService || (PgModule.default as any)?.PostgresDataService || PgModule.default as any;
+      if (!PostgresDataServiceClass || typeof PostgresDataServiceClass !== 'function') {
+        console.error("Failed to resolve PostgresDataService class from module", PgModule);
+        throw new Error("PostgresDataService class not found in module.");
+      }
       console.log("Server-side: Using PostgresDataService.");
-      return new PostgresDataServiceModule.PostgresDataService();
+      return new PostgresDataServiceClass();
     } catch (error) {
       console.error("Server-side: Failed to initialize PostgresDataService:", error);
-      throw error; // Propagate error
+      throw error; 
     }
   } else if (dataSourceType === 'mongodb') {
     const hasFullMongoConfig = process.env.MONGODB_URI && process.env.MONGODB_DB_NAME;
@@ -57,18 +62,28 @@ async function getServiceInstance(): Promise<IDataService> {
       throw new Error(errorMessage);
     }
     try {
-      MongoDataServiceModule = await import('./mongo-data-service');
+      const MongoModule = await import('./mongo-data-service');
+      // Robustly try to get the class constructor
+      const MongoDataServiceClass = MongoModule.MongoDataService || (MongoModule.default as any)?.MongoDataService || MongoModule.default as any;
+       if (!MongoDataServiceClass || typeof MongoDataServiceClass !== 'function') {
+        console.error("Failed to resolve MongoDataService class from module", MongoModule);
+        throw new Error("MongoDataService class not found in module.");
+      }
       console.log("Server-side: Using MongoDataService.");
-      return new MongoDataServiceModule.MongoDataService();
+      return new MongoDataServiceClass();
     } catch (error) {
       console.error("Server-side: Failed to initialize MongoDataService:", error);
-      throw error; // Propagate error
+      throw error; 
     }
-  } else { // 'local' or if dataSourceType is explicitly 'local'
+  } else { 
     console.log("Server-side: Using LocalDataService (for server-side operations in local mode).");
-    LocalDataServiceModule = await import('./local-data-service');
-    // This LocalDataService instance will use in-memory initial data on the server.
-    return new LocalDataServiceModule.LocalDataService();
+    const LocalDataServiceModule = await import('./local-data-service');
+    const LocalDataServiceClass = LocalDataServiceModule.LocalDataService || (LocalDataServiceModule.default as any)?.LocalDataService || LocalDataServiceModule.default as any;
+    if (!LocalDataServiceClass || typeof LocalDataServiceClass !== 'function') {
+      console.error("Failed to resolve LocalDataService class from module for server-side local mode", LocalDataServiceModule);
+      throw new Error("LocalDataService class not found for server-side local mode.");
+    }
+    return new LocalDataServiceClass();
   }
 }
 
@@ -119,4 +134,3 @@ export const deleteLink = async (id: string): Promise<boolean> => {
   const service = await getServiceInstance();
   return service.deleteLink(id);
 };
-

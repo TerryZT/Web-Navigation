@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getCategories as getCategoriesServer, getLinks as getLinksServer } from '@/lib/data-service'; // Server actions
+// Import actual server actions
+import { getCategoriesAction } from './categories/actions'; 
+import { getLinksAction } from './links/actions';
 import { getClientLocalDataService } from '@/lib/client-local-data-service'; // Client-side service
 import type { IDataService } from '@/lib/data-service-interface';
 
@@ -18,8 +20,8 @@ function getEffectiveDataService(): IDataService {
   }
   // For non-local modes, return an object that calls the server actions
   return {
-    getCategories: getCategoriesServer,
-    getLinks: getLinksServer,
+    getCategories: getCategoriesAction, // Use server action
+    getLinks: getLinksAction,           // Use server action
     // Dummy implementations for other IDataService methods not used by this page
     getLinksByCategoryId: async (categoryId: string) => { console.warn("getLinksByCategoryId called on server action stub from admin dashboard"); return []; },
     getLink: async (id: string) => { console.warn("getLink called on server action stub from admin dashboard"); return undefined; },
