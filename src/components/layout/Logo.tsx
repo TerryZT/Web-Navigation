@@ -1,3 +1,4 @@
+
 "use client";
 import React from 'react';
 
@@ -35,11 +36,11 @@ const Logo: React.FC = () => {
       </div>
 
       {/* 全科启蒙 / 0-12岁 (Text part - on the right for md screens) */}
-      <div className="flex flex-col items-center text-center md:items-start md:text-left">
+      <div className="flex flex-col items-center text-center">
         <div className="text-4xl font-bold text-foreground">
           全科启蒙
         </div>
-        <div className="text-sm text-muted-foreground tracking-wider mt-1"> {/* Font size reverted to text-sm */}
+        <div className="text-base text-muted-foreground tracking-wider mt-1">
           0-12岁
         </div>
       </div>
@@ -49,3 +50,4 @@ const Logo: React.FC = () => {
 };
 
 export default Logo;
+
