@@ -1,4 +1,4 @@
-"use client";
+
 import type { Category, LinkItem } from '@/types';
 import type { IDataService } from './data-service-interface';
 
@@ -42,6 +42,7 @@ const setLocalStorageItem = <T>(key: string, value: T): void => {
 };
 
 // Initialize with default data if local storage is empty
+// This block will only run on the client-side when the module is imported.
 if (typeof window !== "undefined") {
   if (localStorage.getItem(CATEGORIES_KEY) === null) {
     setLocalStorageItem(CATEGORIES_KEY, initialCategories);
@@ -52,6 +53,7 @@ if (typeof window !== "undefined") {
 }
 export class LocalDataService implements IDataService {
   async getCategories(): Promise<Category[]> {
+    // On server, this will return initialCategories as localStorage is not available
     return Promise.resolve(getLocalStorageItem(CATEGORIES_KEY, initialCategories));
   }
 
@@ -61,8 +63,12 @@ export class LocalDataService implements IDataService {
   }
 
   async addCategory(categoryData: Omit<Category, "id">): Promise<Category> {
-    const categories = await this.getCategories();
+    const categories = await this.getCategories(); // Gets initial data on server
     const newCategory: Category = { ...categoryData, id: Date.now().toString() };
+    // On server, setLocalStorageItem does nothing. Data remains in-memory for this instance if modified.
+    // However, getCategories() re-fetches initialCategories on server for each call.
+    // For more consistent in-memory mock on server, would need an instance-based store.
+    // But for basic server action "local" mode, this might be acceptable (each action gets fresh data).
     setLocalStorageItem(CATEGORIES_KEY, [...categories, newCategory]);
     return Promise.resolve(newCategory);
   }
