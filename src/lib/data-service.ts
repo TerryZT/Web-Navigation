@@ -86,4 +86,3 @@ export const getLink = (id: string): Promise<LinkItem | undefined> => dataServic
 export const addLink = (link: Omit<LinkItem, "id">): Promise<LinkItem> => dataServiceInstance.addLink(link);
 export const updateLink = (updatedLink: LinkItem): Promise<LinkItem | null> => dataServiceInstance.updateLink(updatedLink);
 export const deleteLink = (id: string): Promise<boolean> => dataServiceInstance.deleteLink(id);
-
