@@ -1,31 +1,53 @@
 
-"use client";
 import type { Category, LinkItem } from "@/types";
 import type { IDataService } from './data-service-interface';
 import { LocalDataService } from './local-data-service';
-import { FirebaseDataService } from './firebase-data-service';
-import { app as firebaseAppInstance } from './firebase-config'; // Use 'app' to check if Firebase initialized
+import { PostgresDataService } from './postgres-data-service';
+import { MongoDataService } from './mongo-data-service';
 
 let dataServiceInstance: IDataService;
 
 const dataSourceType = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE || 'local';
 
-if (dataSourceType === 'firebase' && firebaseAppInstance) {
-  try {
-    dataServiceInstance = new FirebaseDataService();
-    console.log("Using FirebaseDataService");
-  } catch (error) {
-    console.error("Failed to initialize FirebaseDataService, falling back to LocalDataService:", error);
-    dataServiceInstance = new LocalDataService();
-     console.log("Fell back to LocalDataService due to Firebase init error");
+function initializeDataService(): IDataService {
+  if (dataSourceType === 'postgres') {
+    try {
+      // Check for necessary PostgreSQL environment variables
+      if (
+        (process.env.POSTGRES_HOST && process.env.POSTGRES_PORT && process.env.POSTGRES_USER && process.env.POSTGRES_PASSWORD && process.env.POSTGRES_DB) ||
+        process.env.POSTGRES_CONNECTION_STRING
+      ) {
+        console.log("Attempting to use PostgresDataService");
+        return new PostgresDataService();
+      } else {
+        console.warn("PostgreSQL environment variables are not fully set. Falling back to LocalDataService.");
+        return new LocalDataService();
+      }
+    } catch (error) {
+      console.error("Failed to initialize PostgresDataService, falling back to LocalDataService:", error);
+      return new LocalDataService();
+    }
+  } else if (dataSourceType === 'mongodb') {
+    try {
+      // Check for necessary MongoDB environment variables
+      if (process.env.MONGODB_URI && process.env.MONGODB_DB_NAME) {
+        console.log("Attempting to use MongoDataService");
+        return new MongoDataService();
+      } else {
+        console.warn("MongoDB environment variables are not fully set. Falling back to LocalDataService.");
+        return new LocalDataService();
+      }
+    } catch (error) {
+      console.error("Failed to initialize MongoDataService, falling back to LocalDataService:", error);
+      return new LocalDataService();
+    }
+  } else {
+    console.log("Using LocalDataService");
+    return new LocalDataService();
   }
-} else {
-  if (dataSourceType === 'firebase' && !firebaseAppInstance) {
-    console.warn("Firebase is selected as data source, but not configured/initialized. Falling back to LocalDataService.");
-  }
-  dataServiceInstance = new LocalDataService();
-  console.log("Using LocalDataService");
 }
+
+dataServiceInstance = initializeDataService();
 
 // Categories CRUD
 export const getCategories = (): Promise<Category[]> => dataServiceInstance.getCategories();
