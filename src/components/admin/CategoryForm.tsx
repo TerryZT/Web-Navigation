@@ -25,6 +25,7 @@ import { iconMap } from "@/components/icons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Category } from "@/types";
 import IconComponent from "@/components/icons";
+import { useTransition } from "react";
 
 const categoryFormSchema = z.object({
   name: z.string().min(2, { message: "Category name must be at least 2 characters." }).max(50),
@@ -46,6 +47,7 @@ const availableIcons = Object.keys(iconMap).filter(iconName => iconName !== 'Def
 
 
 export function CategoryForm({ isOpen, onClose, onSubmit, defaultValues, isEditing }: CategoryFormProps) {
+  const [isPending, startTransition] = useTransition();
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
@@ -56,8 +58,10 @@ export function CategoryForm({ isOpen, onClose, onSubmit, defaultValues, isEditi
   });
   
   const formSubmitHandler = (data: CategoryFormValues) => {
-    onSubmit(data);
-    form.reset(); // Reset form after submission
+    startTransition(() => {
+      onSubmit(data);
+      form.reset();
+    });
   };
 
   return (
@@ -127,7 +131,7 @@ export function CategoryForm({ isOpen, onClose, onSubmit, defaultValues, isEditi
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { form.reset(); onClose(); }}>Cancel</Button>
-              <Button type="submit">{isEditing ? "Save Changes" : "Add Category"}</Button>
+              <Button type="submit" disabled={isPending}>{isEditing ? "Save Changes" : "Add Category"}</Button>
             </DialogFooter>
           </form>
         </Form>

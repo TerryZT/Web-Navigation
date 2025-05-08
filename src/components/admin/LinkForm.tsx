@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { LinkItem, Category } from "@/types";
 import IconComponent, { iconMap } from "@/components/icons";
+import { useTransition } from "react";
 
 const linkFormSchema = z.object({
   title: z.string().min(2, { message: "Title must be at least 2 characters." }).max(100),
@@ -47,6 +48,7 @@ interface LinkFormProps {
 const availableIcons = Object.keys(iconMap).filter(iconName => iconName !== 'Default');
 
 export function LinkForm({ isOpen, onClose, onSubmit, defaultValues, categories, isEditing }: LinkFormProps) {
+  const [isPending, startTransition] = useTransition();
   const form = useForm<LinkFormValues>({
     resolver: zodResolver(linkFormSchema),
     defaultValues: {
@@ -59,8 +61,10 @@ export function LinkForm({ isOpen, onClose, onSubmit, defaultValues, categories,
   });
 
   const formSubmitHandler = (data: LinkFormValues) => {
-    onSubmit(data);
-    form.reset();
+    startTransition(() => {
+      onSubmit(data);
+      form.reset();
+    });
   };
 
   return (
@@ -167,7 +171,7 @@ export function LinkForm({ isOpen, onClose, onSubmit, defaultValues, categories,
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { form.reset(); onClose(); }}>Cancel</Button>
-              <Button type="submit">{isEditing ? "Save Changes" : "Add Link"}</Button>
+              <Button type="submit" disabled={isPending}>{isEditing ? "Save Changes" : "Add Link"}</Button>
             </DialogFooter>
           </form>
         </Form>

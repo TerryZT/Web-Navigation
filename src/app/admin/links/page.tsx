@@ -1,9 +1,7 @@
-
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { LinkItem, Category } from '@/types';
-import { getLinks, getCategories, addLink, updateLink, deleteLink } from '@/lib/data-service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -29,6 +27,8 @@ import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { addLink, deleteLink, getLinks, updateLink } from './actions';
+import { getCategories } from '../categories/actions';
 
 export default function LinksPage() {
   const [links, setLinks] = useState<LinkItem[]>([]);

@@ -1,9 +1,7 @@
-
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Category } from '@/types';
-import { getCategories, addCategory, updateCategory, deleteCategory } from '@/lib/data-service';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -28,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { addCategory, deleteCategory, getCategories, updateCategory } from './actions';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,7 +36,7 @@ export default function CategoriesPage() {
   const [isDeleting, setIsDeleting] = useState<Category | null>(null);
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const router = useRouter(); // Corrected: Use useRouter from next/navigation
+  const router = useRouter();
 
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
@@ -58,8 +57,7 @@ export default function CategoriesPage() {
     if (action === 'add') {
       setIsFormOpen(true);
       setEditingCategory(undefined);
-      // Remove action from URL after handling
-      const currentPathname = window.location.pathname; // Using window.location.pathname
+      const currentPathname = window.location.pathname;
       window.history.replaceState({}, '', currentPathname);
     }
   }, [fetchCategories, searchParams]);
@@ -77,7 +75,7 @@ export default function CategoriesPage() {
   const handleDeleteCategory = (category: Category) => {
     setIsDeleting(category);
   };
-  
+
   const confirmDelete = async () => {
     if (isDeleting) {
       try {
@@ -114,8 +112,8 @@ export default function CategoriesPage() {
       setIsFormOpen(false);
       setEditingCategory(undefined);
     } catch (error) {
-       console.error("Error submitting form:", error);
-       toast({ title: "Error", description: "An error occurred.", variant: "destructive" });
+      console.error("Error submitting form:", error);
+      toast({ title: "Error", description: "An error occurred.", variant: "destructive" });
     }
   };
 
