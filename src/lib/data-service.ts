@@ -23,14 +23,16 @@ async function initializeDataService(): Promise<IDataService> {
           return new PostgresDataServiceModule.PostgresDataService();
         } else {
           console.warn("PostgreSQL environment variables not fully set (server-side), but Postgres was selected as data source. Falling back to LocalDataService for this context.");
+          return new LocalDataService();
         }
       } catch (error) {
         console.error("Failed to initialize PostgresDataService (server-side), falling back to LocalDataService:", error);
+        return new LocalDataService();
       }
     } else {
       console.warn("PostgresDataService cannot be used on the client. Client-side operations will use LocalDataService. For production with Postgres, ensure data is fetched via Server Actions or API routes.");
+      return new LocalDataService();
     }
-    return new LocalDataService();
   } else if (dataSourceType === 'mongodb') {
     if (!isBrowser) {
       try {
@@ -40,14 +42,16 @@ async function initializeDataService(): Promise<IDataService> {
           return new MongoDataServiceModule.MongoDataService();
         } else {
           console.warn("MongoDB environment variables are not fully set (server-side), but MongoDB was selected as data source. Falling back to LocalDataService for this context.");
+          return new LocalDataService();
         }
       } catch (error) {
         console.error("Failed to initialize MongoDataService (server-side), falling back to LocalDataService:", error);
+        return new LocalDataService();
       }
     } else {
       console.warn("MongoDataService cannot be used on the client. Client-side operations will use LocalDataService. For production with MongoDB, ensure data is fetched via Server Actions or API routes.");
+      return new LocalDataService();
     }
-    return new LocalDataService();
   } else { // 'local' or undefined
     console.log("Using LocalDataService (client or server).");
     return new LocalDataService();
