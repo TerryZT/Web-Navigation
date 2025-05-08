@@ -92,6 +92,12 @@ const nextConfig: NextConfig = {
             resourceRegExp: /^timers\/promises$/,
           })
         );
+    
+     config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^pg-cloudflare$/,
+          })
+        );
 
     return config;
   },
