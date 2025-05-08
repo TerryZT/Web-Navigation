@@ -18,7 +18,7 @@ const Logo: React.FC = () => {
             K
           </div>
           <div className="relative flex items-center justify-center w-12 h-12 bg-orange-400 text-white text-3xl font-bold rounded-lg transform rotate-3">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-yellow-200 absolute top-1 right-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 text-yellow-200">
               <circle cx="12" cy="12" r="10"></circle>
               <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
               <line x1="9" y1="9" x2="9.01" y2="9"></line>
@@ -41,7 +41,7 @@ const Logo: React.FC = () => {
         <div className="text-4xl font-bold text-foreground">
           全科启蒙
         </div>
-        <div className="text-base text-muted-foreground tracking-wider mt-1">
+        <div className="text-lg text-muted-foreground tracking-wider mt-1">
           0-12岁
         </div>
       </div>
