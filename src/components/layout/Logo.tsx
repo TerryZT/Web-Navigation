@@ -4,7 +4,7 @@ import React from 'react';
 
 const Logo: React.FC = () => {
   return (
-    <div className="flex flex-col md:flex-row items-center my-8 select-none" data-ai-hint="kids education logo">
+    <div className="flex flex-col md:flex-row items-center md:items-baseline my-8 select-none" data-ai-hint="kids education logo">
       <div className="flex items-end space-x-1 mb-4 md:mb-0 md:mr-4">
         <div className="flex items-center justify-center w-12 h-12 bg-red-500 text-white text-3xl font-bold rounded-lg transform -rotate-6">
           K
