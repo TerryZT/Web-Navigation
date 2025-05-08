@@ -11,5 +11,6 @@ export interface LinkItem {
   url: string;
   description?: string;
   categoryId: string;
-  icon?: string; // Lucide icon name or path to image, for now lucide
+  icon?: string; // Can be Lucide name, URL, or Data URI. Undefined if iconSource is 'none'.
+  iconSource?: 'lucide' | 'url' | 'data' | 'none'; // Indicates the source/type of the icon string
 }
