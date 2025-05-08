@@ -1,6 +1,7 @@
+
 "use client";
-import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { LinkItem, Category } from '@/types';
 import { getLinks, getCategories, addLink, updateLink, deleteLink } from '@/lib/data-service';
 import { Button } from '@/components/ui/button';
@@ -27,28 +28,45 @@ import { useToast } from '@/hooks/use-toast';
 import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function LinksPage() {
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<LinkItem | undefined>(undefined);
   const [isDeleting, setIsDeleting] = useState<LinkItem | null>(null);
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const router = useRouter();
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [fetchedLinks, fetchedCategories] = await Promise.all([
+        getLinks(),
+        getCategories()
+      ]);
+      setLinks(fetchedLinks);
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      toast({ title: "Error", description: "Could not load links or categories.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    setLinks(getLinks());
-    setCategories(getCategories());
+    fetchData();
     const action = searchParams.get('action');
     if (action === 'add') {
       setIsFormOpen(true);
       setEditingLink(undefined);
-      const newPath = router.pathname; 
-      window.history.replaceState({}, '', newPath);
+      const currentPathname = window.location.pathname;
+      window.history.replaceState({}, '', currentPathname);
     }
-  }, [searchParams, router.pathname]);
+  }, [fetchData, searchParams]);
 
   const handleAddLink = () => {
     if (categories.length === 0) {
@@ -73,39 +91,77 @@ export default function LinksPage() {
     setIsDeleting(link);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (isDeleting) {
-      const success = deleteLink(isDeleting.id);
-       if (success) {
-        setLinks(getLinks());
-        toast({ title: "Link Deleted", description: `Link "${isDeleting.title}" has been deleted.` });
-      } else {
-        toast({ title: "Error", description: "Failed to delete link.", variant: "destructive" });
+      try {
+        const success = await deleteLink(isDeleting.id);
+        if (success) {
+          await fetchData();
+          toast({ title: "Link Deleted", description: `Link "${isDeleting.title}" has been deleted.` });
+        } else {
+          toast({ title: "Error", description: "Failed to delete link.", variant: "destructive" });
+        }
+      } catch (error) {
+        console.error("Error deleting link:", error);
+        toast({ title: "Error", description: "An error occurred while deleting the link.", variant: "destructive" });
+      } finally {
+        setIsDeleting(null);
       }
-      setIsDeleting(null);
     }
   };
 
-  const handleSubmitForm = (values: Omit<LinkItem, 'id'> & { id?: string }) => {
-    if (editingLink) {
-      const updated = updateLink({ ...editingLink, ...values });
-      if (updated) {
-        toast({ title: "Link Updated", description: `Link "${updated.title}" has been updated.` });
+  const handleSubmitForm = async (values: Omit<LinkItem, 'id'> & { id?: string }) => {
+    try {
+      if (editingLink) {
+        const updated = await updateLink({ ...editingLink, ...values });
+        if (updated) {
+          toast({ title: "Link Updated", description: `Link "${updated.title}" has been updated.` });
+        } else {
+          toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
+        }
       } else {
-        toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
+        const newL = await addLink(values);
+        toast({ title: "Link Added", description: `Link "${newL.title}" has been added.` });
       }
-    } else {
-      const newL = addLink(values);
-      toast({ title: "Link Added", description: `Link "${newL.title}" has been added.` });
+      await fetchData();
+      setIsFormOpen(false);
+      setEditingLink(undefined);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast({ title: "Error", description: "An error occurred.", variant: "destructive" });
     }
-    setLinks(getLinks());
-    setIsFormOpen(false);
-    setEditingLink(undefined);
   };
 
   const getCategoryName = (categoryId: string) => {
     return categories.find(cat => cat.id === categoryId)?.name || 'N/A';
   };
+
+  if (isLoading) {
+    return (
+       <Card className="shadow-xl">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-10 w-32" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-4 p-2">
+                <Skeleton className="h-5 w-5 rounded-full" />
+                <Skeleton className="h-5 w-1/5" />
+                <Skeleton className="h-5 w-2/5" />
+                <Skeleton className="h-5 w-1/5" />
+                <div className="ml-auto flex space-x-2">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-xl">

@@ -1,6 +1,6 @@
 
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { Category, LinkItem } from '@/types';
 import { getCategories, getLinksByCategoryId } from '@/lib/data-service';
 import AppHeader from '@/components/layout/AppHeader';
@@ -9,6 +9,7 @@ import CategorySection from '@/components/links/CategorySection';
 import Logo from '@/components/layout/Logo';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from '@/hooks/use-toast';
 
 export default function HomePage() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
@@ -19,21 +20,32 @@ export default function HomePage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const loadData = () => {
-      const fetchedCategories = getCategories();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const fetchedCategories = await getCategories();
       setAllCategories(fetchedCategories);
 
       const newLinksMap: Record<string, LinkItem[]> = {};
-      fetchedCategories.forEach(category => {
-        newLinksMap[category.id] = getLinksByCategoryId(category.id);
-      });
+      // Fetch links for all categories in parallel
+      await Promise.all(fetchedCategories.map(async (category) => {
+        newLinksMap[category.id] = await getLinksByCategoryId(category.id);
+      }));
       setAllLinksMap(newLinksMap);
+
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      toast({ title: "Error", description: "Could not load link data.", variant: "destructive" });
+    } finally {
       setLoading(false);
-    };
+    }
+  }, [toast]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     if (loading) return;

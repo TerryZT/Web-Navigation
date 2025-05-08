@@ -1,5 +1,6 @@
+
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Category } from '@/types';
 import { getCategories, addCategory, updateCategory, deleteCategory } from '@/lib/data-service';
@@ -26,28 +27,42 @@ import { CategoryForm } from '@/components/admin/CategoryForm';
 import { useToast } from '@/hooks/use-toast';
 import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | undefined>(undefined);
   const [isDeleting, setIsDeleting] = useState<Category | null>(null);
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useRouter(); // Corrected: Use useRouter from next/navigation
 
+  const fetchCategories = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedCategories = await getCategories();
+      setCategories(fetchedCategories);
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      toast({ title: "Error", description: "Could not load categories.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    setCategories(getCategories());
+    fetchCategories();
     const action = searchParams.get('action');
     if (action === 'add') {
       setIsFormOpen(true);
       setEditingCategory(undefined);
-       // Remove action from URL after handling
-      const newPath = router.pathname; // Use router.pathname from next/navigation
-      window.history.replaceState({}, '', newPath);
+      // Remove action from URL after handling
+      const currentPathname = window.location.pathname; // Using window.location.pathname
+      window.history.replaceState({}, '', currentPathname);
     }
-  }, [searchParams, router.pathname]);
+  }, [fetchCategories, searchParams]);
 
   const handleAddCategory = () => {
     setEditingCategory(undefined);
@@ -63,35 +78,72 @@ export default function CategoriesPage() {
     setIsDeleting(category);
   };
   
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (isDeleting) {
-      const success = deleteCategory(isDeleting.id);
-      if (success) {
-        setCategories(getCategories());
-        toast({ title: "Category Deleted", description: `Category "${isDeleting.name}" has been deleted.` });
-      } else {
-        toast({ title: "Error", description: "Failed to delete category.", variant: "destructive" });
+      try {
+        const success = await deleteCategory(isDeleting.id);
+        if (success) {
+          await fetchCategories();
+          toast({ title: "Category Deleted", description: `Category "${isDeleting.name}" has been deleted.` });
+        } else {
+          toast({ title: "Error", description: "Failed to delete category.", variant: "destructive" });
+        }
+      } catch (error) {
+        console.error("Error deleting category:", error);
+        toast({ title: "Error", description: "An error occurred while deleting the category.", variant: "destructive" });
+      } finally {
+        setIsDeleting(null);
       }
-      setIsDeleting(null);
     }
   };
 
-  const handleSubmitForm = (values: Omit<Category, 'id'> & { id?: string }) => {
-    if (editingCategory) {
-      const updated = updateCategory({ ...editingCategory, ...values });
-      if (updated) {
-        toast({ title: "Category Updated", description: `Category "${updated.name}" has been updated.` });
+  const handleSubmitForm = async (values: Omit<Category, 'id'> & { id?: string }) => {
+    try {
+      if (editingCategory) {
+        const updated = await updateCategory({ ...editingCategory, ...values });
+        if (updated) {
+          toast({ title: "Category Updated", description: `Category "${updated.name}" has been updated.` });
+        } else {
+          toast({ title: "Error", description: "Failed to update category.", variant: "destructive" });
+        }
       } else {
-        toast({ title: "Error", description: "Failed to update category.", variant: "destructive" });
+        const newCat = await addCategory(values);
+        toast({ title: "Category Added", description: `Category "${newCat.name}" has been added.` });
       }
-    } else {
-      const newCat = addCategory(values);
-      toast({ title: "Category Added", description: `Category "${newCat.name}" has been added.` });
+      await fetchCategories();
+      setIsFormOpen(false);
+      setEditingCategory(undefined);
+    } catch (error) {
+       console.error("Error submitting form:", error);
+       toast({ title: "Error", description: "An error occurred.", variant: "destructive" });
     }
-    setCategories(getCategories());
-    setIsFormOpen(false);
-    setEditingCategory(undefined);
   };
+
+  if (isLoading) {
+    return (
+      <Card className="shadow-xl">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-10 w-32" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-4 p-2">
+                <Skeleton className="h-5 w-5 rounded-full" />
+                <Skeleton className="h-5 w-1/4" />
+                <Skeleton className="h-5 w-1/2" />
+                <div className="ml-auto flex space-x-2">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-xl">

@@ -1,20 +1,78 @@
+
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getCategories, getLinks } from '@/lib/data-service';
-import type { Category, LinkItem } from '@/types';
 import IconComponent from '@/components/icons';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 export default function AdminDashboardPage() {
   const [categoryCount, setCategoryCount] = useState(0);
   const [linkCount, setLinkCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
+
+  const fetchCounts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [categories, links] = await Promise.all([
+        getCategories(),
+        getLinks(),
+      ]);
+      setCategoryCount(categories.length);
+      setLinkCount(links.length);
+    } catch (error) {
+      console.error("Failed to fetch counts:", error);
+      // Optionally set counts to 0 or show an error message
+      setCategoryCount(0);
+      setLinkCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setCategoryCount(getCategories().length);
-    setLinkCount(getLinks().length);
-  }, []);
+    fetchCounts();
+  }, [fetchCounts]);
+
+  if (isLoading) {
+    return (
+      <div>
+        <Skeleton className="h-10 w-1/3 mb-6" /> {/* Title Skeleton */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-5 w-1/2" /> {/* Card Title Skeleton */}
+                <Skeleton className="h-5 w-5 rounded-full" /> {/* Icon Skeleton */}
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-1/4 mb-1" /> {/* Count Skeleton */}
+                <Skeleton className="h-4 w-3/4 mb-2" /> {/* Description Skeleton */}
+                <Skeleton className="h-8 w-24" /> {/* Button Skeleton */}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card className="mt-8 shadow-lg">
+          <CardHeader>
+            <Skeleton className="h-7 w-1/2 mb-2" /> {/* Welcome Title Skeleton */}
+            <Skeleton className="h-5 w-full" /> {/* Welcome Description Skeleton */}
+             <Skeleton className="h-5 w-3/4 mt-1" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-5 w-1/4 mb-2" /> {/* "Get started by:" Skeleton */}
+            <ul className="list-disc list-inside mt-2 space-y-2 text-sm">
+              <li><Skeleton className="h-5 w-3/4" /></li>
+              <li><Skeleton className="h-5 w-3/4" /></li>
+              <li><Skeleton className="h-5 w-3/4" /></li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
