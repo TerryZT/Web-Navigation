@@ -154,7 +154,7 @@ export function LinkForm({ isOpen, onClose, onSubmit, defaultValues, categories,
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No Icon</SelectItem>
+                      <SelectItem value="none">No Icon</SelectItem>
                       {availableIcons.map((iconName) => (
                         <SelectItem key={iconName} value={iconName}>
                           <div className="flex items-center gap-2">
