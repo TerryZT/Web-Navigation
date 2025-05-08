@@ -1,3 +1,4 @@
+
 import type { Category, LinkItem } from '@/types';
 import type { IDataService } from './data-service-interface';
 import { Pool, type PoolClient } from 'pg';
@@ -34,29 +35,11 @@ export class PostgresDataService implements IDataService {
       } else {
         throw new Error("PostgreSQL connection details not found in environment variables. Set POSTGRES_CONNECTION_STRING or individual POSTGRES_ variables.");
       }
-      this.testConnection();
+      // Removed this.testConnection(); Connection will be tested on first query.
     } catch (error) {
       console.error("PostgresDataService: Failed to initialize PostgreSQL pool during constructor:", error);
       this.pool = null; 
       throw error; 
-    }
-  }
-
-  private async testConnection() {
-    if (!this.pool) {
-        console.warn("PostgresDataService: Pool is not initialized, skipping connection test.");
-        return;
-    }
-    let client: PoolClient | undefined;
-    try {
-      client = await this.pool.connect();
-      console.log("PostgresDataService: Successfully connected to PostgreSQL via pool and tested.");
-    } catch (error) {
-      console.error("PostgresDataService: Failed to connect to PostgreSQL via pool during testConnection:", error);
-      // This error is critical, should probably prevent service from being used or rethrow.
-      // For now, it logs, and subsequent operations will fail if the pool is truly unusable.
-    } finally {
-      client?.release();
     }
   }
 
@@ -80,7 +63,7 @@ export class PostgresDataService implements IDataService {
 
 
   async getCategories(): Promise<Category[]> {
-    // Assumes table 'categories' with columns: id (TEXT), name (TEXT), description (TEXT), icon (TEXT)
+    // Assumes table 'categories' with columns: id (TEXT PRIMARY KEY), name (TEXT NOT NULL), description (TEXT), icon (TEXT)
     const query = `SELECT id, name, description, icon FROM ${CATEGORIES_TABLE}`;
     return this.executeQuery<Category>(query);
   }
@@ -97,7 +80,7 @@ export class PostgresDataService implements IDataService {
     const query = `INSERT INTO ${CATEGORIES_TABLE} (id, name, description, icon) VALUES ($1, $2, $3, $4) RETURNING id, name, description, icon`;
     const result = await this.executeQuery<Category>(query, [newId, name, description || null, icon || null]);
     if (result.length === 0) {
-        throw new Error("PostgresDataService: Failed to add category, no data returned.");
+        throw new Error("PostgresDataService: Failed to add category, no data returned from insert.");
     }
     return result[0];
   }
@@ -112,7 +95,7 @@ export class PostgresDataService implements IDataService {
   async deleteCategory(id: string): Promise<boolean> {
     if (!this.pool) {
       console.error("PostgresDataService: PostgreSQL pool not initialized. Cannot delete category.");
-      return false;
+      throw new Error("PostgreSQL pool not initialized for deleteCategory.");
     }
     const client: PoolClient = await this.pool.connect();
     try {
@@ -125,15 +108,15 @@ export class PostgresDataService implements IDataService {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('PostgresDataService: Error deleting category or its links from Postgres:', error);
-      return false;
+      throw error; // Re-throw to allow server action to handle it
     } finally {
       client.release();
     }
   }
 
   async getLinks(): Promise<LinkItem[]> {
-    // Assumes table 'links' with columns: id (TEXT), title (TEXT), url (TEXT), description (TEXT), 
-    // "categoryId" (TEXT), icon (TEXT), "iconSource" (TEXT)
+    // Assumes table 'links' with columns: id (TEXT PRIMARY KEY), title (TEXT NOT NULL), url (TEXT NOT NULL), description (TEXT), 
+    // "categoryId" (TEXT REFERENCES categories(id)), icon (TEXT), "iconSource" (TEXT)
     const query = `SELECT id, title, url, description, "categoryId", icon, "iconSource" FROM ${LINKS_TABLE}`;
     return this.executeQuery<LinkItem>(query);
   }
@@ -155,7 +138,7 @@ export class PostgresDataService implements IDataService {
     const query = `INSERT INTO ${LINKS_TABLE} (id, title, url, description, "categoryId", icon, "iconSource") VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, title, url, description, "categoryId", icon, "iconSource"`;
     const result = await this.executeQuery<LinkItem>(query, [newId, title, url, description || null, categoryId, icon || null, iconSource || 'none']);
     if (result.length === 0) {
-        throw new Error("PostgresDataService: Failed to add link, no data returned.");
+        throw new Error("PostgresDataService: Failed to add link, no data returned from insert.");
     }
     return result[0];
   }
@@ -171,7 +154,7 @@ export class PostgresDataService implements IDataService {
     const query = `DELETE FROM ${LINKS_TABLE} WHERE id = $1`;
     if (!this.pool) {
         console.error("PostgresDataService: PostgreSQL pool not initialized. Cannot delete link.");
-        return false;
+        throw new Error("PostgreSQL pool not initialized for deleteLink.");
     }
     let client: PoolClient | undefined;
     try {
@@ -180,9 +163,10 @@ export class PostgresDataService implements IDataService {
         return result.rowCount !== null && result.rowCount > 0;
     } catch (error) {
         console.error(`PostgresDataService: Error executing query "DELETE FROM ${LINKS_TABLE} WHERE id = $1":`, error);
-        return false;
+        throw error; // Re-throw
     } finally {
         client?.release();
     }
   }
 }
+
