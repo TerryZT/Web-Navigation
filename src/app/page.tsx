@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import type { Category, LinkItem } from '@/types';
@@ -17,9 +18,11 @@ const IS_LOCAL_STORAGE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE === 'loca
 
 function getEffectiveDataService(): IDataService {
   if (IS_LOCAL_STORAGE_MODE) {
+    console.log("Public Page: Using ClientLocalDataService");
     return getClientLocalDataService();
   }
   // For non-local modes, return an object that calls the server actions
+  console.log("Public Page: Using Server Actions for data");
   return {
     getCategories: getCategoriesServer,
     getLinksByCategoryId: getLinksByCategoryIdServer,
@@ -53,6 +56,7 @@ export default function HomePage() {
     const service = getEffectiveDataService();
     try {
       const fetchedCategories = await service.getCategories();
+      console.log("Public Page - Fetched Categories:", fetchedCategories);
       setAllCategories(fetchedCategories);
 
       const newLinksMap: Record<string, LinkItem[]> = {};
@@ -60,6 +64,7 @@ export default function HomePage() {
       await Promise.all(fetchedCategories.map(async (category) => {
         newLinksMap[category.id] = await service.getLinksByCategoryId(category.id);
       }));
+      console.log("Public Page - Fetched Links Map:", newLinksMap);
       setAllLinksMap(newLinksMap);
 
     } catch (error) {
@@ -164,3 +169,4 @@ export default function HomePage() {
     </div>
   );
 }
+
