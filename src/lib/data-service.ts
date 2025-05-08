@@ -32,7 +32,8 @@ function initializeDataService(): IDataService {
           console.log("Attempting to use PostgresDataService (server-side).");
           return new PostgresDataServiceModule.PostgresDataService();
         } else {
-          console.warn("PostgreSQL environment variables not fully set (server-side). Falling back to LocalDataService for this context.");
+          // Only warn if Postgres is the selected data source
+          console.warn("PostgreSQL environment variables not fully set (server-side), but Postgres was selected as data source. Falling back to LocalDataService for this context.");
           return new LocalDataService();
         }
       } catch (error) {
@@ -51,7 +52,8 @@ function initializeDataService(): IDataService {
           console.log("Attempting to use MongoDataService (server-side).");
           return new MongoDataServiceModule.MongoDataService();
         } else {
-          console.warn("MongoDB environment variables are not fully set (server-side). Falling back to LocalDataService for this context.");
+          // Only warn if MongoDB is the selected data source
+          console.warn("MongoDB environment variables are not fully set (server-side), but MongoDB was selected as data source. Falling back to LocalDataService for this context.");
           return new LocalDataService();
         }
       } catch (error) {
