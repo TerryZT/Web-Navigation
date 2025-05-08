@@ -40,16 +40,11 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     root.classList.add(currentMode);
     setEffectiveMode(currentMode);
 
-    // Add the scheme class if:
-    // 1. The scheme is NOT 'classic-teal' (meaning it's any other theme like purple-bliss, forest-whisper etc.)
-    // OR
-    // 2. The scheme IS 'classic-teal' AND the currentMode is 'dark'.
-    // This ensures that 'classic-teal' in light mode does not get a specific theme class,
-    // allowing it to use the default :root styles defined in globals.css.
-    // All other themes, or 'classic-teal' in dark mode, will get their specific theme class.
-    if (scheme !== 'classic-teal' || (scheme === 'classic-teal' && currentMode === 'dark')) {
+    // Add the scheme class unless it's classic-teal in light mode (which uses default :root)
+    if (!(scheme === 'classic-teal' && currentMode === 'light')) {
         root.classList.add(`theme-${scheme}`);
     }
+
 
     localStorage.setItem('themeScheme', scheme);
     localStorage.setItem('themeMode', mode);
@@ -66,7 +61,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     setThemeModeState(initialMode);
     // Initial application of theme based on stored or default values
     // This will also set effectiveMode correctly via applyTheme
-  }, []); // Removed applyTheme from dependency array to avoid double call on init
+  }, []); 
 
   useEffect(() => {
     // This effect runs whenever themeScheme or themeMode (or initial values from above useEffect) change

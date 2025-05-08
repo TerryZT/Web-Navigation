@@ -8,7 +8,7 @@ body {
 
 @layer base {
   :root {
-    /* Classic Teal - Original Default Theme */
+    /* Classic Teal - Default Light Theme */
     --background: 0 0% 94.1%; /* #F0F0F0 */
     --foreground: 0 0% 20%; /* Dark Gray for text, e.g. #333333 */
     --card: 0 0% 100%; /* #FFFFFF */
@@ -47,25 +47,26 @@ body {
   }
 
   .dark {
+    /* Default Dark Theme (used by Classic Teal in dark mode if no specific .dark.theme-classic-teal exists or is minimal) */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 180 100% 35.1%; /* Darker Teal */
+    --primary: 180 100% 35.1%; /* Darker Teal for default dark */
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 14.9%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 180 100% 35.1%; /* Darker Teal */
+    --accent: 180 100% 35.1%; /* Darker Teal for default dark */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 180 100% 35.1%; /* Darker Teal */
+    --ring: 180 100% 35.1%; /* Darker Teal for default dark */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -81,8 +82,19 @@ body {
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 180 100% 35.1%;
   }
+  
+  /* Classic Teal - Dark Mode Specific Overrides (if any, otherwise uses .dark defaults) */
+  .dark.theme-classic-teal {
+    /* You can override specific variables for Classic Teal in dark mode here if needed. 
+       If not, it will inherit from the general .dark styles. */
+    /* Example:
+    --primary: 180 90% 40%; 
+    --accent: 180 90% 40%;
+    */
+  }
 
-  /* Purple Bliss Theme (from image) */
+
+  /* Purple Bliss Theme (Light) */
   .theme-purple-bliss {
     --background: 250 50% 98%; /* Very Light Lavender */
     --foreground: 240 10% 15%; /* Dark Slate Gray */
@@ -112,6 +124,7 @@ body {
     --sidebar-ring: 270 70% 55%;
   }
 
+  /* Purple Bliss Theme (Dark) */
   .dark.theme-purple-bliss {
     --background: 240 10% 10%; /* Dark Purpleish Blue */
     --foreground: 250 30% 90%; /* Light Lavender Gray text */
@@ -142,7 +155,7 @@ body {
   }
   
 
-  /* Forest Whisper Theme */
+  /* Forest Whisper Theme (Light) */
   .theme-forest-whisper {
     --background: 40 30% 96%; /* Light Beige */
     --foreground: 90 25% 15%; /* Dark Olive Green */
@@ -163,6 +176,7 @@ body {
     --ring: 120 60% 30%;
   }
 
+  /* Forest Whisper Theme (Dark) */
   .dark.theme-forest-whisper {
     --background: 90 15% 10%; /* Very Dark Green */
     --foreground: 40 40% 90%; /* Light Beige text */
@@ -183,7 +197,7 @@ body {
     --ring: 120 50% 45%;
   }
 
-  /* Ocean Blue Theme */
+  /* Ocean Blue Theme (Light) */
   .theme-ocean-blue {
     --background: 205 50% 97%; /* Very Light Blue */
     --foreground: 210 30% 20%; /* Dark Slate Blue */
@@ -203,7 +217,8 @@ body {
     --input: 200 40% 91%;
     --ring: 200 80% 45%;
   }
-
+  
+  /* Ocean Blue Theme (Dark) */
   .dark.theme-ocean-blue {
     --background: 210 30% 12%; /* Dark Navy */
     --foreground: 200 40% 92%; /* Light Cyan text */
@@ -224,7 +239,7 @@ body {
     --ring: 200 70% 55%;
   }
 
-  /* Sunset Orange Theme */
+  /* Sunset Orange Theme (Light) */
   .theme-sunset-orange {
     --background: 30 100% 97%; /* Very Pale Orange */
     --foreground: 25 60% 25%; /* Dark Brown */
@@ -245,6 +260,7 @@ body {
     --ring: 20 90% 55%;
   }
 
+  /* Sunset Orange Theme (Dark) */
   .dark.theme-sunset-orange {
     --background: 20 40% 10%; /* Dark Brown-Orange */
     --foreground: 35 80% 90%; /* Pale Yellow text */
@@ -265,7 +281,7 @@ body {
     --ring: 25 90% 65%;
   }
 
-  /* Rose Pink Theme */
+  /* Rose Pink Theme (Light) */
   .theme-rose-pink {
     --background: 340 100% 98%; /* Very Light Pink */
     --foreground: 330 40% 25%; /* Dark Rose */
@@ -286,6 +302,7 @@ body {
     --ring: 335 80% 60%;
   }
 
+  /* Rose Pink Theme (Dark) */
   .dark.theme-rose-pink {
     --background: 330 30% 10%; /* Dark Plum */
     --foreground: 345 70% 92%; /* Light Pink text */
