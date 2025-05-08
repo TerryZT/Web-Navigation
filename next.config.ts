@@ -81,6 +81,17 @@ const nextConfig: NextConfig = {
       // config.externals.push('mongodb-client-encryption'); // Example
     }
 
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^dns$/,
+      })
+    );
+
+     config.plugins.push(
+          new webpack.IgnorePlugin({
+            resourceRegExp: /^timers\/promises$/,
+          })
+        );
 
     return config;
   },
