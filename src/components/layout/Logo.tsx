@@ -36,7 +36,8 @@ const Logo: React.FC = () => {
       </div>
 
       {/* 全科启蒙 / 0-12岁 (Text part - on the right for md screens) */}
-      <div className="flex flex-col items-center text-center">
+      {/* Added mt-2 here to move the text block down slightly */}
+      <div className="flex flex-col items-center text-center mt-2 md:mt-0">
         <div className="text-4xl font-bold text-foreground">
           全科启蒙
         </div>
