@@ -27,8 +27,8 @@ import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { addLink, deleteLink, getLinks, updateLink } from './actions';
-import { getCategories } from '../categories/actions';
+import { getLinksAction, addLinkAction, deleteLinkAction, updateLinkAction } from './actions';
+import { getCategoriesAction } from '../categories/actions';
 
 export default function LinksPage() {
   const [links, setLinks] = useState<LinkItem[]>([]);
@@ -44,8 +44,8 @@ export default function LinksPage() {
     setIsLoading(true);
     try {
       const [fetchedLinks, fetchedCategories] = await Promise.all([
-        getLinks(),
-        getCategories()
+        getLinksAction(),
+        getCategoriesAction()
       ]);
       setLinks(fetchedLinks);
       setCategories(fetchedCategories);
@@ -94,7 +94,7 @@ export default function LinksPage() {
   const confirmDelete = async () => {
     if (isDeleting) {
       try {
-        const success = await deleteLink(isDeleting.id);
+        const success = await deleteLinkAction(isDeleting.id);
         if (success) {
           await fetchData();
           toast({ title: "Link Deleted", description: `Link "${isDeleting.title}" has been deleted.` });
@@ -113,14 +113,14 @@ export default function LinksPage() {
   const handleSubmitForm = async (values: Omit<LinkItem, 'id'> & { id?: string }) => {
     try {
       if (editingLink) {
-        const updated = await updateLink({ ...editingLink, ...values });
+        const updated = await updateLinkAction({ ...editingLink, ...values });
         if (updated) {
           toast({ title: "Link Updated", description: `Link "${updated.title}" has been updated.` });
         } else {
           toast({ title: "Error", description: "Failed to update link.", variant: "destructive" });
         }
       } else {
-        const newL = await addLink(values);
+        const newL = await addLinkAction(values);
         toast({ title: "Link Added", description: `Link "${newL.title}" has been added.` });
       }
       await fetchData();

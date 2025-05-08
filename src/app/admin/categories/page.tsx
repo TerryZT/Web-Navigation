@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import IconComponent from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { addCategory, deleteCategory, getCategories, updateCategory } from './actions';
+import { getCategoriesAction, addCategoryAction, deleteCategoryAction, updateCategoryAction } from './actions';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -41,7 +41,7 @@ export default function CategoriesPage() {
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedCategories = await getCategories();
+      const fetchedCategories = await getCategoriesAction();
       setCategories(fetchedCategories);
     } catch (error) {
       console.error("Failed to fetch categories:", error);
@@ -79,7 +79,7 @@ export default function CategoriesPage() {
   const confirmDelete = async () => {
     if (isDeleting) {
       try {
-        const success = await deleteCategory(isDeleting.id);
+        const success = await deleteCategoryAction(isDeleting.id);
         if (success) {
           await fetchCategories();
           toast({ title: "Category Deleted", description: `Category "${isDeleting.name}" has been deleted.` });
@@ -98,14 +98,14 @@ export default function CategoriesPage() {
   const handleSubmitForm = async (values: Omit<Category, 'id'> & { id?: string }) => {
     try {
       if (editingCategory) {
-        const updated = await updateCategory({ ...editingCategory, ...values });
+        const updated = await updateCategoryAction({ ...editingCategory, ...values });
         if (updated) {
           toast({ title: "Category Updated", description: `Category "${updated.name}" has been updated.` });
         } else {
           toast({ title: "Error", description: "Failed to update category.", variant: "destructive" });
         }
       } else {
-        const newCat = await addCategory(values);
+        const newCat = await addCategoryAction(values);
         toast({ title: "Category Added", description: `Category "${newCat.name}" has been added.` });
       }
       await fetchCategories();
@@ -216,3 +216,4 @@ export default function CategoriesPage() {
     </Card>
   );
 }
+
