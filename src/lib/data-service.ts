@@ -5,10 +5,8 @@ import type { IDataService } from './data-service-interface';
 // Conditional imports for server-side services.
 const dataSourceType = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE || 'local';
 
-// Static imports for server-side services
-import { LocalDataService as ServerLocalDataService } from './local-data-service'; // For server-side 'local' mode
-import { PostgresDataService } from './postgres-data-service';
-import { MongoDataService } from './mongo-data-service';
+// Static import for ServerLocalDataService as it's simple and unlikely to cause bundling issues.
+import { LocalDataService as ServerLocalDataService } from './local-data-service'; 
 
 async function getServiceInstance(): Promise<IDataService> {
   if (typeof window !== 'undefined') {
@@ -42,23 +40,19 @@ async function getServiceInstance(): Promise<IDataService> {
       throw new Error(errorMessage);
     }
     try {
-      console.log("Server-side: Checking PostgresDataService import type.");
-      if (typeof PostgresDataService === 'undefined') {
-        console.error("PostgresDataService import is undefined! This means the import failed or the module did not export it correctly.");
-        throw new Error("PostgresDataService is undefined. Check import/export or module resolution in Vercel build.");
-      }
-      // A class constructor is a function with a prototype property.
+      console.log("Server-side: Dynamically importing PostgresDataService...");
+      const { PostgresDataService } = await import('./postgres-data-service');
+      console.log("Server-side: PostgresDataService imported. Checking type.");
       if (typeof PostgresDataService !== 'function' || !PostgresDataService.prototype) {
-         console.error(`PostgresDataService is not a constructor. Type: ${typeof PostgresDataService}. Has prototype: ${!!(PostgresDataService as any)?.prototype}. Name: ${(PostgresDataService as any)?.name}`);
-        throw new Error(`PostgresDataService is not a constructor (type: ${typeof PostgresDataService}). Check Vercel build output.`);
+         console.error(`PostgresDataService is not a constructor after dynamic import. Type: ${typeof PostgresDataService}. Has prototype: ${!!(PostgresDataService as any)?.prototype}. Name: ${(PostgresDataService as any)?.name}`);
+        throw new Error(`PostgresDataService is not a constructor (type: ${typeof PostgresDataService}). Check module export or build issues.`);
       }
       console.log("Server-side: PostgresDataService appears to be a valid constructor. Instantiating...");
       const serviceInstance = new PostgresDataService();
       console.log("Server-side: PostgresDataService instantiated successfully.");
       return serviceInstance;
     } catch (error) {
-      console.error("Server-side CRITICAL: Failed to initialize or instantiate PostgresDataService. This could be due to issues with the class definition, constructor errors (e.g., connection issues, missing 'pg' driver), or other runtime problems. Please verify your Vercel environment variables, database setup, and check server logs for details from PostgresDataService constructor. Original error:", error);
-      // Propagate the error for server actions to handle
+      console.error("Server-side CRITICAL: Failed to dynamically import, initialize, or instantiate PostgresDataService. Error:", error);
       throw error; 
     }
   } else if (dataSourceType === 'mongodb') {
@@ -69,22 +63,24 @@ async function getServiceInstance(): Promise<IDataService> {
       throw new Error(errorMessage);
     }
     try {
-      console.log("Server-side: Instantiating MongoDataService (statically imported).");
+      console.log("Server-side: Dynamically importing MongoDataService...");
+      const { MongoDataService } = await import('./mongo-data-service');
+      console.log("Server-side: MongoDataService imported. Checking type.");
        if (typeof MongoDataService !== 'function' || !MongoDataService.prototype) {
-         console.error(`MongoDataService is not a constructor. Type: ${typeof MongoDataService}. Has prototype: ${!!(MongoDataService as any)?.prototype}. Name: ${(MongoDataService as any)?.name}`);
-        throw new Error(`MongoDataService is not a constructor (type: ${typeof MongoDataService}). Check Vercel build output.`);
+         console.error(`MongoDataService is not a constructor after dynamic import. Type: ${typeof MongoDataService}. Has prototype: ${!!(MongoDataService as any)?.prototype}. Name: ${(MongoDataService as any)?.name}`);
+        throw new Error(`MongoDataService is not a constructor (type: ${typeof MongoDataService}). Check module export or build issues.`);
       }
+      console.log("Server-side: MongoDataService appears to be a valid constructor. Instantiating...");
       const serviceInstance = new MongoDataService();
       console.log("Server-side: MongoDataService instantiated successfully.");
       return serviceInstance;
     } catch (error) {
-       console.error("Server-side CRITICAL: Failed to initialize or instantiate MongoDataService. Original error:", error);
+       console.error("Server-side CRITICAL: Failed to dynamically import, initialize or instantiate MongoDataService. Original error:", error);
       throw error; 
     }
   } else { 
     // 'local' or undefined on server
     console.log("Server-side: Using ServerLocalDataService (for server-side operations in local mode).");
-    // Uses the statically imported and aliased ServerLocalDataService
     return new ServerLocalDataService();
   }
 }
@@ -143,4 +139,3 @@ export {
     getCategories as getCategoriesCore, 
     getLinksByCategoryId as getLinksByCategoryIdCore 
 };
-
