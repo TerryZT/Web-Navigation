@@ -18,7 +18,9 @@ let mongoServiceInstance: IDataService | null = null;
 let serverLocalServiceInstance: IDataService | null = null;
 
 async function initializeServiceInstance(): Promise<IDataService> {
-  if (typeof window !== 'undefined') {
+  const isClientSide = typeof window !== 'undefined';
+
+  if (isClientSide) {
     // CLIENT-SIDE LOGIC
     if (dataSourceType === 'local' || !dataSourceType) {
       // console.log("Client-side: Using ClientLocalDataService via getClientLocalDataService.");
@@ -220,3 +222,5 @@ export {
     getCategories as getCategoriesCore, 
     getLinksByCategoryId as getLinksByCategoryIdCore 
 };
+
+    
