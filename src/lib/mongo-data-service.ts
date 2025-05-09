@@ -13,23 +13,23 @@ export class MongoDataService implements IDataService {
   private dbName: string;
 
   constructor() {
-    console.log("MongoDataService: Constructor called.");
+    // console.log("MongoDataService: Constructor called.");
     const uri = process.env.MONGODB_URI;
     const dbNameFromEnv = process.env.MONGODB_DB_NAME;
 
     if (!uri || !dbNameFromEnv) {
       const errMsg = "MongoDataService CRITICAL Error: MongoDB URI or DB Name not found in environment variables.";
-      console.error(errMsg);
+      console.error("CRITICAL_ERROR_TRACE: MongoConfigMissingInConstructor", { errMsg, hasUri: !!uri, hasDbName: !!dbNameFromEnv });
       throw new Error(errMsg);
     }
     this.dbName = dbNameFromEnv;
     try {
         this.client = new MongoClient(uri);
-        console.log("MongoDataService: MongoClient instance created. Health check will be performed separately.");
+        // console.log("MongoDataService: MongoClient instance created. Health check will be performed separately.");
     } catch (error: any) {
         console.error("MongoDataService CRITICAL: Failed to initialize MongoClient during constructor.", {
             errorMessage: error.message,
-            errorStack: error.stack?.substring(0, 500)
+            errorStack: error.stack?.substring(0, 700) // Increased stack trace
         });
         this.client = null;
         throw error;
@@ -37,47 +37,62 @@ export class MongoDataService implements IDataService {
   }
 
   private async connect(): Promise<void> {
+    // console.log("MongoDataService: connect() called.");
     if (!this.client) {
+      console.error("CRITICAL_ERROR_TRACE: ClientNotInitializedInConnect");
       throw new Error("MongoDataService: MongoDB client not initialized.");
     }
-    if (this.db) { // Already connected
-        // console.log("MongoDataService: Already connected to DB, skipping connect.");
+    if (this.db) { 
+        // console.log("MongoDataService: Already connected to DB, skipping connect logic.");
         return;
     }
     try {
+      // console.log("MongoDataService: Attempting this.client.connect().");
       await this.client.connect();
       this.db = this.client.db(this.dbName);
-      console.log("MongoDataService: Successfully connected to MongoDB and database selected.");
-    } catch (error) {
-      console.error("MongoDataService: Failed to connect to MongoDB:", error);
-      this.db = null; // Ensure db is null if connection fails
-      throw error; // Re-throw to be caught by the health check or service instantiation
+      // console.log("MongoDataService: Successfully connected to MongoDB and database selected.");
+    } catch (error: any) {
+      console.error("MongoDataService: Failed to connect to MongoDB in connect().", {
+        errorMessage: error.message,
+        errorStack: error.stack?.substring(0,700)
+      });
+      this.db = null; 
+      throw error; 
     }
   }
 
   async healthCheck(): Promise<void> {
-    if (this.db) { // Already connected and presumably healthy from a previous check/operation
+    // console.log("MongoDataService: healthCheck() called.");
+    if (this.db) { 
         // console.log("MongoDataService: DB already connected, performing quick ping for health check.");
         try {
             await this.db.command({ ping: 1 });
-            console.log("MongoDataService: Health check (ping) successful on existing connection.");
+            // console.log("MongoDataService: Health check (ping) successful on existing connection.");
             return;
         } catch (pingError: any) {
-            console.warn("MongoDataService: Ping failed on existing connection, attempting to reconnect.", pingError.message);
+            console.warn("MongoDataService: Ping failed on existing connection, attempting to reconnect.", {
+              errorMessage: pingError.message,
+              errorStack: pingError.stack?.substring(0,300)
+            });
             this.db = null; // Force reconnect
         }
     }
 
-    console.log("MongoDataService: Attempting to connect for health check...");
-    await this.connect(); // This will throw if it fails
-    if (!this.db) { // Should not happen if connect() doesn't throw but as a safeguard
-        throw new Error("MongoDataService: Health check failed, DB connection not established after connect call.");
+    // console.log("MongoDataService: Attempting to connect for health check...");
+    await this.connect(); 
+    if (!this.db) { 
+      console.error("CRITICAL_ERROR_TRACE: DBNotEstablishedAfterConnectInHealthCheck");
+      throw new Error("MongoDataService: Health check failed, DB connection not established after connect call.");
     }
     try {
+      // console.log("MongoDataService: Pinging database after establishing connection for health check.");
       await this.db.command({ ping: 1 });
-      console.log("MongoDataService: Health check (connect and ping) successful.");
+      // console.log("MongoDataService: Health check (connect and ping) successful.");
     } catch (error: any) {
-      console.error("MongoDataService: Health check FAILED after connection.", { errorMessage: error.message, errorStack: error.stack?.substring(0,300) });
+      console.error("MongoDataService: Health check FAILED after connection.", { 
+        errorMessage: error.message, 
+        errorStack: error.stack?.substring(0,700) 
+      });
       throw new Error(`MongoDataService: Health check failed. Unable to ping database. Original error: ${error.message}`);
     }
   }
@@ -144,14 +159,14 @@ export class MongoDataService implements IDataService {
     const session = this.client?.startSession(); 
     try {
       if (session) {
-        console.log("MongoDataService: Starting transaction to delete category and links.");
+        // console.log("MongoDataService: Starting transaction to delete category and links.");
         await session.withTransaction(async () => {
           await linksCollection.deleteMany({ categoryId: id }, { session });
           await categoriesCollection.deleteOne({ _id: new ObjectId(id) }, { session });
         });
-         console.log("MongoDataService: Transaction committed for category deletion.");
+         // console.log("MongoDataService: Transaction committed for category deletion.");
       } else { // No transaction support (e.g. standalone instances)
-         console.warn("MongoDataService: Transactions not supported, deleting category and links sequentially.");
+         // console.warn("MongoDataService: Transactions not supported, deleting category and links sequentially.");
          await linksCollection.deleteMany({ categoryId: id });
          const result = await categoriesCollection.deleteOne({ _id: new ObjectId(id) });
          return result.deletedCount > 0;
@@ -160,7 +175,7 @@ export class MongoDataService implements IDataService {
     } catch (error) {
       console.error("MongoDataService Error: Error deleting category or its links from MongoDB:", error);
       if (session?.inTransaction()) {
-          console.log("MongoDataService: Aborting transaction due to error.");
+          // console.log("MongoDataService: Aborting transaction due to error.");
           await session.abortTransaction();
       }
       return false;
@@ -230,8 +245,7 @@ export class MongoDataService implements IDataService {
       await this.client.close();
       this.client = null;
       this.db = null;
-      console.log("MongoDataService: MongoDB connection closed.");
+      // console.log("MongoDataService: MongoDB connection closed.");
     }
   }
 }
-

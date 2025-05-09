@@ -2,141 +2,167 @@
 import type { Category, LinkItem } from "@/types";
 import type { IDataService } from './data-service-interface';
 
-// Conditional imports for server-side services.
 const dataSourceType = process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE || 'local';
 
-// Static import for ServerLocalDataService as it's simple and unlikely to cause bundling issues.
-import { LocalDataService as ServerLocalDataService } from './local-data-service'; 
+// Import ServerLocalDataService statically as it's simple.
+// This service is used if NEXT_PUBLIC_DATA_SOURCE_TYPE is 'local' when running on the server.
+import { LocalDataService as ServerLocalDataService } from './local-data-service';
 
-// Cache for service instance to avoid re-initialization on every call within the same context (e.g., server request)
-let serviceInstancePromise: Promise<IDataService> | null = null;
+// Cache for server-side service instances.
+// We want to reuse the same PostgresDataService or MongoDataService instance
+// (and thus its pool/client) across multiple operations within the same serverless function invocation,
+// and potentially across invocations if the Vercel environment allows.
+// The healthCheck within these services should ensure connections are live.
+let postgresServiceInstance: IDataService | null = null;
+let mongoServiceInstance: IDataService | null = null;
+let serverLocalServiceInstance: IDataService | null = null;
 
 async function initializeServiceInstance(): Promise<IDataService> {
   if (typeof window !== 'undefined') {
-    // Client-side:
+    // CLIENT-SIDE LOGIC
     if (dataSourceType === 'local' || !dataSourceType) {
-      // console.log("Client-side: Using ClientLocalDataService");
+      // console.log("Client-side: Using ClientLocalDataService via getClientLocalDataService.");
+      // Dynamically import client-local-data-service to avoid server-side bundling of client code.
       const { getClientLocalDataService } = await import('./client-local-data-service');
       return getClientLocalDataService();
     } else {
       const errorMessage = `Client-side direct data access for non-local data source type ('${dataSourceType}') is prohibited. Use Server Actions.`;
-      console.error(errorMessage);
+      console.error("CRITICAL_ERROR_TRACE: ClientDataServiceProhibited", { dataSourceType });
       throw new Error(errorMessage);
     }
   }
 
-  // Server-side logic:
-  console.log(`Server-side: Initializing data service. dataSourceType: "${dataSourceType}"`);
-  
-  const pgConnectionString = process.env.POSTGRES_CONNECTION_STRING;
-  const pgHost = process.env.POSTGRES_HOST;
-  // console.log(`Server-side: POSTGRES_CONNECTION_STRING is set: ${!!pgConnectionString}`);
-  // if (pgConnectionString) {
-  //   const safeCsSnippet = pgConnectionString.substring(0, pgConnectionString.indexOf('@') > 0 ? pgConnectionString.indexOf('@') : 30);
-  //   console.log(`Server-side: POSTGRES_CONNECTION_STRING snippet: "${safeCsSnippet}..."`);
-  // } else {
-  //   console.log(`Server-side: Individual PG vars - HOST: ${!!pgHost}, PORT: ${!!process.env.POSTGRES_PORT}, USER: ${!!process.env.POSTGRES_USER}, DB: ${!!process.env.POSTGRES_DB}, PASS_SET: ${!!process.env.POSTGRES_PASSWORD}`);
-  // }
-  
-  const mongoUri = process.env.MONGODB_URI;
-  const mongoDbName = process.env.MONGODB_DB_NAME;
-  // console.log(`Server-side: MONGODB_URI is set: ${!!mongoUri}`);
-  // console.log(`Server-side: MONGODB_DB_NAME is set: ${!!mongoDbName}`);
-
+  // SERVER-SIDE LOGIC
+  // console.log(`Server-side: initializeServiceInstance called. dataSourceType: "${dataSourceType}"`);
 
   if (dataSourceType === 'postgres') {
-    const hasFullPostgresConfig = 
-      (pgHost && 
-       process.env.POSTGRES_PORT && 
-       process.env.POSTGRES_USER && 
-       process.env.POSTGRES_PASSWORD && 
-       process.env.POSTGRES_DB) || 
-      pgConnectionString;
+    const pgConnectionString = process.env.POSTGRES_CONNECTION_STRING;
+    const pgHost = process.env.POSTGRES_HOST;
+    const hasFullPostgresConfig =
+      (pgHost && process.env.POSTGRES_PORT && process.env.POSTGRES_USER && process.env.POSTGRES_PASSWORD && process.env.POSTGRES_DB) || pgConnectionString;
 
     if (!hasFullPostgresConfig) {
-      const errorMessage = "Server-side Error: dataSourceType is 'postgres', but PostgreSQL environment variables (POSTGRES_HOST, etc.) or POSTGRES_CONNECTION_STRING are not fully set. Halting application startup for this data path.";
-      console.error(errorMessage);
+      const errorMessage = "Server-side CRITICAL Error: dataSourceType is 'postgres', but PostgreSQL environment variables (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB) or POSTGRES_CONNECTION_STRING are not fully set.";
+      console.error("CRITICAL_ERROR_TRACE: PostgresConfigMissing", { hasConnectionString: !!pgConnectionString, hasHost: !!pgHost });
       throw new Error(errorMessage);
     }
+
+    if (postgresServiceInstance) {
+      // console.log("Server-side: Reusing existing PostgresDataService instance. Performing health check.");
+      try {
+        if (typeof postgresServiceInstance.healthCheck !== 'function') {
+          console.warn("Server-side: Cached postgresServiceInstance does not have a healthCheck method. Re-creating.");
+          postgresServiceInstance = null; // Force re-creation
+        } else {
+          await postgresServiceInstance.healthCheck();
+          // console.log("Server-side: Existing PostgresDataService instance health check OK.");
+          return postgresServiceInstance;
+        }
+      } catch (e: any) {
+        console.warn("Server-side: Health check failed for existing PostgresDataService instance, will create a new one.", { message: e.message, stack: e.stack?.substring(0,300) });
+        postgresServiceInstance = null; // Force re-creation
+      }
+    }
+    // console.log("Server-side: Attempting to create a new PostgresDataService instance.");
     try {
-      console.log("Server-side: Dynamically importing PostgresDataService...");
+      // console.log("Server-side: Dynamically importing PostgresDataService module...");
       const { PostgresDataService } = await import('./postgres-data-service');
-      console.log("Server-side: PostgresDataService module imported.");
+      // console.log("Server-side: PostgresDataService module imported. Instantiating...");
       if (typeof PostgresDataService !== 'function' || !PostgresDataService.prototype) {
          const errorMsg = `Server-side CRITICAL: Imported PostgresDataService is not a constructor. Type: ${typeof PostgresDataService}.`;
-         console.error(errorMsg);
+         console.error("CRITICAL_ERROR_TRACE: PostgresNotConstructor", { type: typeof PostgresDataService });
         throw new Error(errorMsg);
       }
-      console.log("Server-side: Instantiating PostgresDataService...");
       const service = new PostgresDataService();
-      console.log("Server-side: PostgresDataService instantiated. Performing health check...");
+      // console.log("Server-side: PostgresDataService instantiated. Performing initial health check...");
       if (typeof service.healthCheck !== 'function') {
-        throw new Error("PostgresDataService instance does not have a healthCheck method.");
+        throw new Error("Newly created PostgresDataService instance does not have a healthCheck method.");
       }
-      await service.healthCheck(); // Await health check
-      console.log("Server-side: PostgresDataService health check successful.");
-      return service;
+      await service.healthCheck();
+      // console.log("Server-side: PostgresDataService initial health check successful. Caching instance.");
+      postgresServiceInstance = service;
+      return postgresServiceInstance;
     } catch (error: any) {
-      console.error("Server-side CRITICAL: Failed to import, instantiate, or healthCheck PostgresDataService.", {
+      console.error("Server-side CRITICAL: Failed to initialize or healthCheck PostgresDataService.", {
         errorMessage: error.message,
-        errorStack: error.stack?.substring(0,1000)
+        errorStack: error.stack?.substring(0, 1000)
       });
-      throw error; 
+      postgresServiceInstance = null;
+      throw error;
     }
   } else if (dataSourceType === 'mongodb') {
+    const mongoUri = process.env.MONGODB_URI;
+    const mongoDbName = process.env.MONGODB_DB_NAME;
     const hasFullMongoConfig = mongoUri && mongoDbName;
+
     if (!hasFullMongoConfig) {
-      const errorMessage = "Server-side Error: dataSourceType is 'mongodb', but MongoDB environment variables (MONGODB_URI, MONGODB_DB_NAME) are not fully set. Halting application startup for this data path.";
-      console.error(errorMessage);
+      const errorMessage = "Server-side CRITICAL Error: dataSourceType is 'mongodb', but MongoDB environment variables (MONGODB_URI, MONGODB_DB_NAME) are not fully set.";
+      console.error("CRITICAL_ERROR_TRACE: MongoConfigMissing", { hasUri: !!mongoUri, hasDbName: !!mongoDbName });
       throw new Error(errorMessage);
     }
+    
+    if (mongoServiceInstance) {
+      // console.log("Server-side: Reusing existing MongoDataService instance. Performing health check.");
+      try {
+        if (typeof mongoServiceInstance.healthCheck !== 'function') {
+           console.warn("Server-side: Cached mongoServiceInstance does not have a healthCheck method. Re-creating.");
+           mongoServiceInstance = null; // Force re-creation
+        } else {
+          await mongoServiceInstance.healthCheck();
+          // console.log("Server-side: Existing MongoDataService instance health check OK.");
+          return mongoServiceInstance;
+        }
+      } catch (e: any) {
+        console.warn("Server-side: Health check failed for existing MongoDataService instance, will create a new one.", { message: e.message, stack: e.stack?.substring(0,300) });
+        mongoServiceInstance = null;
+      }
+    }
+    // console.log("Server-side: Attempting to create a new MongoDataService instance.");
     try {
-      console.log("Server-side: Dynamically importing MongoDataService...");
+      // console.log("Server-side: Dynamically importing MongoDataService module...");
       const { MongoDataService } = await import('./mongo-data-service');
-      console.log("Server-side: MongoDataService module imported.");
-       if (typeof MongoDataService !== 'function' || !MongoDataService.prototype) {
-         const errorMsg = `Server-side CRITICAL: Imported MongoDataService is not a constructor. Type: ${typeof MongoDataService}.`;
-         console.error(errorMsg);
+      // console.log("Server-side: MongoDataService module imported. Instantiating...");
+      if (typeof MongoDataService !== 'function' || !MongoDataService.prototype) {
+        const errorMsg = `Server-side CRITICAL: Imported MongoDataService is not a constructor. Type: ${typeof MongoDataService}.`;
+        console.error("CRITICAL_ERROR_TRACE: MongoNotConstructor", { type: typeof MongoDataService });
         throw new Error(errorMsg);
       }
-      console.log("Server-side: Instantiating MongoDataService...");
       const service = new MongoDataService();
-      console.log("Server-side: MongoDataService instantiated. Performing health check...");
-      if (typeof service.healthCheck !== 'function') {
-        throw new Error("MongoDataService instance does not have a healthCheck method.");
+      // console.log("Server-side: MongoDataService instantiated. Performing initial health check...");
+       if (typeof service.healthCheck !== 'function') {
+        throw new Error("Newly created MongoDataService instance does not have a healthCheck method.");
       }
-      await service.healthCheck(); // Await health check
-      console.log("Server-side: MongoDataService health check successful.");
-      return service;
+      await service.healthCheck();
+      // console.log("Server-side: MongoDataService initial health check successful. Caching instance.");
+      mongoServiceInstance = service;
+      return mongoServiceInstance;
     } catch (error: any) {
-       console.error("Server-side CRITICAL: Failed to import, instantiate, or healthCheck MongoDataService.", {
-         errorMessage: error.message,
-         errorStack: error.stack?.substring(0,1000)
-       });
-      throw error; 
+      console.error("Server-side CRITICAL: Failed to initialize or healthCheck MongoDataService.", {
+        errorMessage: error.message,
+        errorStack: error.stack?.substring(0, 1000)
+      });
+      mongoServiceInstance = null;
+      throw error;
     }
-  } else { 
-    // 'local' or undefined on server
-    console.log("Server-side: Using ServerLocalDataService (for server-side operations in local mode).");
-    const service = new ServerLocalDataService();
-    // LocalDataService health check is a no-op, but call for consistency if desired
-    if (service.healthCheck) {
-       await service.healthCheck();
+  } else { // 'local' or undefined on server
+    // console.log("Server-side: Using ServerLocalDataService.");
+    if (!serverLocalServiceInstance) {
+      // console.log("Server-side: Creating new ServerLocalDataService instance.");
+      serverLocalServiceInstance = new ServerLocalDataService();
+      // LocalDataService healthCheck is a no-op, but if it needed one, it would be here.
+      if (serverLocalServiceInstance.healthCheck) {
+        await serverLocalServiceInstance.healthCheck();
+      }
     }
-    return service;
+    return serverLocalServiceInstance;
   }
 }
 
-// Getter for the service instance, ensuring it's initialized only once per context
+// Wrapper to ensure that the service instance is initialized.
+// This is the main entry point for data operations.
 function getServiceInstance(): Promise<IDataService> {
-  if (typeof window !== 'undefined') { // Always re-initialize on client for simplicity with client-local-data-service
-    return initializeServiceInstance();
-  }
-  // Server-side, use cached promise
-  if (!serviceInstancePromise) {
-    serviceInstancePromise = initializeServiceInstance();
-  }
-  return serviceInstancePromise;
+  // initializeServiceInstance now handles client/server logic and caching internally.
+  return initializeServiceInstance();
 }
 
 
@@ -194,4 +220,3 @@ export {
     getCategories as getCategoriesCore, 
     getLinksByCategoryId as getLinksByCategoryIdCore 
 };
-
