@@ -34,51 +34,68 @@ export class PostgresDataService implements IDataService {
         });
         console.log("PostgresDataService: Pool configured using individual POSTGRES_ variables.");
       } else {
-        console.error("PostgresDataService Error: PostgreSQL connection details not found in environment variables.");
-        throw new Error("PostgreSQL connection details not found in environment variables. Set POSTGRES_CONNECTION_STRING or individual POSTGRES_ variables.");
+        const errMsg = "PostgresDataService CRITICAL Error: PostgreSQL connection details NOT FOUND in environment variables. Set POSTGRES_CONNECTION_STRING or individual POSTGRES_ variables.";
+        console.error(errMsg);
+        throw new Error(errMsg);
       }
       
-      console.log("PostgresDataService: Pool object created. Attempting initial test query...");
-      this.pool.query('SELECT NOW()')
-        .then((result) => console.log("PostgresDataService: Initial test query successful. Current DB time:", result.rows[0].now))
-        .catch(err => {
-          console.error("PostgresDataService CRITICAL: Initial test query FAILED. This indicates a problem connecting to or querying the database. Check connection string, credentials, network access (firewalls), and database status.", err);
-          // Depending on the error, the pool might still be created but subsequent queries will likely fail.
-          // For persistent errors here, the application won't function correctly with Postgres.
-        });
+      if (this.pool) {
+        console.log("PostgresDataService: Pool object successfully created. Attempting initial test query (async)...");
+        this.pool.query('SELECT NOW() AS now')
+          .then((result) => console.log("PostgresDataService: Initial test query successful. Current DB time:", result.rows[0].now))
+          .catch(err => {
+            console.error("PostgresDataService CRITICAL: Initial test query FAILED. This is a strong indicator of connection/config issues with the database. Subsequent queries will likely fail.", {
+              message: err.message,
+              code: err.code,
+              stack: err.stack?.substring(0, 300)
+            });
+          });
+      } else {
+         // This case should ideally not be reached if the logic above is correct, as an error should have been thrown.
+         const errMsg = "PostgresDataService CRITICAL: Pool object is NULL after initialization attempt, though no error was thrown by Pool constructor. This is unexpected.";
+         console.error(errMsg);
+         throw new Error(errMsg);
+      }
 
-    } catch (error) {
-      console.error("PostgresDataService CRITICAL: Failed to initialize PostgreSQL pool during constructor. This might be due to invalid configuration format or missing 'pg' module.", error);
+    } catch (error: any) {
+      console.error("PostgresDataService CRITICAL: Failed to initialize PostgreSQL pool during constructor. This might be due to invalid configuration format (e.g. port not a number), missing 'pg' module, or other synchronous issues.", {
+        errorMessage: error.message,
+        errorStack: error.stack?.substring(0, 500)
+      });
       this.pool = null; 
       throw error; 
     }
   }
 
   private async executeQuery<T>(queryText: string, values?: any[]): Promise<T[]> {
-    console.log(`PostgresDataService: Attempting to execute query: ${queryText.substring(0,150)}... Values: ${values ? JSON.stringify(values) : 'None'}`);
+    const querySnippet = queryText.substring(0,150);
+    console.log(`PostgresDataService: Attempting to execute query: ${querySnippet}... Values: ${values ? JSON.stringify(values) : 'None'}`);
     if (!this.pool) {
-      console.error("PostgresDataService Error: PostgreSQL pool is not initialized. Cannot execute query. This often means the constructor failed, possibly due to invalid connection string, missing environment variables, or database inaccessibility.");
+      console.error("PostgresDataService Error: PostgreSQL pool is not initialized. Cannot execute query. This indicates a failure during constructor or that connection details are missing/invalid.");
       throw new Error("PostgreSQL pool not initialized. Database connection failed during setup.");
     }
     
     let client: PoolClient | undefined;
     try {
-      console.log("PostgresDataService: Acquiring client from pool...");
+      console.log(`PostgresDataService: Acquiring client from pool for query: ${querySnippet}`);
       client = await this.pool.connect();
-      console.log("PostgresDataService: Client acquired. Executing query.");
+      console.log(`PostgresDataService: Client acquired. Executing query: ${querySnippet}`);
       const result = await client.query(queryText, values);
-      console.log(`PostgresDataService: Query executed successfully. Rows affected/returned: ${result.rowCount}`);
+      console.log(`PostgresDataService: Query executed successfully for: ${querySnippet}. Rows affected/returned: ${result.rowCount}`);
       return result.rows as T[];
-    } catch (error) {
-      console.error(`PostgresDataService Error: Failed during query execution for "${queryText.substring(0,150)}...":`, error);
-      if (error && typeof error === 'object' && 'code' in error) {
-        console.error(`PostgresDataService Error Details: PG Code: ${(error as any).code}, Message: ${(error as Error).message}`);
-      }
-      throw error; // Re-throw the error to be handled by the caller (Server Action)
+    } catch (error: any) {
+      console.error(`PostgresDataService Error: Failed during query execution for "${querySnippet}". Values: ${values ? JSON.stringify(values) : 'None'}`, {
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetail: error.detail, // Often useful for PG errors
+        errorHint: error.hint,     // Sometimes PG provides hints
+        errorStack: error.stack?.substring(0, 700) // Log more of stack
+      });
+      throw error; 
     } finally {
       if (client) {
         client.release();
-        console.log("PostgresDataService: Client released back to pool.");
+        console.log(`PostgresDataService: Client released back to pool after query: ${querySnippet}`);
       }
     }
   }
@@ -132,16 +149,19 @@ export class PostgresDataService implements IDataService {
       await client.query('COMMIT');
       console.log(`PostgresDataService: Category ${id} and associated links deleted successfully. Rows affected for category deletion: ${result.rowCount}`);
       return result.rowCount !== null && result.rowCount > 0;
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
-      console.error(`PostgresDataService Error: Error deleting category ${id} or its links from Postgres. Rolled back transaction.`, error);
-      if (error && typeof error === 'object' && 'code' in error) {
-        console.error(`PostgresDataService Error Details: PG Code: ${(error as any).code}, Message: ${(error as Error).message}`);
-      }
+      console.error(`PostgresDataService Error: Error deleting category ${id} or its links from Postgres. Rolled back transaction.`, {
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetail: error.detail,
+        errorHint: error.hint,
+        errorStack: error.stack?.substring(0, 700)
+      });
       throw error; 
     } finally {
       client.release();
-      console.log("PostgresDataService: Client released after deleteCategory operation.");
+      console.log("PostgresDataService: Client released after deleteCategory transaction.");
     }
   }
 
@@ -182,25 +202,6 @@ export class PostgresDataService implements IDataService {
 
   async deleteLink(id: string): Promise<boolean> {
     const query = `DELETE FROM ${LINKS_TABLE} WHERE id = $1`;
-    // Directly use executeQuery which handles pool and client
-    const result = await this.executeQuery<{rowCount?: number}>(query, [id]);
-    // Note: DELETE RETURNING * would give back rows, but without it, check rowCount from the result object passed by pg driver.
-    // The `executeQuery` returns `result.rows`. For DELETE, `rows` is empty. We need to adapt.
-    // This is a bit tricky as `executeQuery` is generic. We'll assume if no error, it worked if `rowCount` was expected.
-    // Better: Modify executeQuery to return the raw result object or specifically handle DML.
-    // For now, if it doesn't throw, and if pg driver sets a rowCount on the result object (which it does, but not on result.rows)
-    // This will need adjustment. A simple way is to have `executeQuery` return `result` itself not `result.rows`.
-    // Let's make a small adjustment for this typical case or rely on error throwing.
-    // A more robust check would be to modify executeQuery or have a specific executeDML.
-    // Given current executeQuery, we can't reliably get rowCount. We'll assume success if no error.
-    // Let's assume an error will be thrown if the deletion fails for reasons like FK constraints (though not on this table directly).
-    // The original implementation was:
-    // const result = await client.query(query, [id]); return result.rowCount !== null && result.rowCount > 0;
-    // We need to replicate that. This means `executeQuery` needs to return more info.
-    // For now, let's return true if it doesn't throw, which is a simplification.
-    // To be correct, `executeQuery` should probably return `QueryResult<any>` from `pg`.
-
-    // Re-simplifying to match previous direct client usage for rowCount:
     if (!this.pool) {
         console.error("PostgresDataService Error: PostgreSQL pool not initialized. Cannot delete link.");
         throw new Error("PostgreSQL pool not initialized for deleteLink.");
@@ -211,11 +212,14 @@ export class PostgresDataService implements IDataService {
         const pgResult = await client.query(query, [id]);
         console.log(`PostgresDataService: Link ${id} delete attempt. Rows affected: ${pgResult.rowCount}`);
         return pgResult.rowCount !== null && pgResult.rowCount > 0;
-    } catch (error) {
-        console.error(`PostgresDataService Error: Failed during link deletion for ID "${id}":`, error);
-        if (error && typeof error === 'object' && 'code' in error) {
-           console.error(`PostgresDataService Error Details: PG Code: ${(error as any).code}, Message: ${(error as Error).message}`);
-        }
+    } catch (error: any) {
+        console.error(`PostgresDataService Error: Failed during link deletion for ID "${id}":`, {
+           errorMessage: error.message,
+           errorCode: error.code,
+           errorDetail: error.detail,
+           errorHint: error.hint,
+           errorStack: error.stack?.substring(0, 700)
+        });
         throw error;
     } finally {
         if (client) {
@@ -225,3 +229,4 @@ export class PostgresDataService implements IDataService {
     }
   }
 }
+

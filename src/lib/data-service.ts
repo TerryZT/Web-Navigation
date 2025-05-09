@@ -23,59 +23,84 @@ async function getServiceInstance(): Promise<IDataService> {
   }
 
   // Server-side logic:
-  console.log(`Server-side: Initializing data service for type: ${dataSourceType}`);
+  console.log(`Server-side: Initializing data service. dataSourceType: "${dataSourceType}"`);
+  console.log(`Server-side: NEXT_PUBLIC_DATA_SOURCE_TYPE: "${process.env.NEXT_PUBLIC_DATA_SOURCE_TYPE}"`);
+  
+  const pgConnectionString = process.env.POSTGRES_CONNECTION_STRING;
+  const pgHost = process.env.POSTGRES_HOST;
+  console.log(`Server-side: POSTGRES_CONNECTION_STRING is set: ${!!pgConnectionString}`);
+  if (pgConnectionString) {
+    const safeCsSnippet = pgConnectionString.substring(0, pgConnectionString.indexOf('@') > 0 ? pgConnectionString.indexOf('@') : 30);
+    console.log(`Server-side: POSTGRES_CONNECTION_STRING snippet: "${safeCsSnippet}..."`);
+  } else {
+    console.log(`Server-side: Individual PG vars - HOST: ${!!pgHost}, PORT: ${!!process.env.POSTGRES_PORT}, USER: ${!!process.env.POSTGRES_USER}, DB: ${!!process.env.POSTGRES_DB}, PASS_SET: ${!!process.env.POSTGRES_PASSWORD}`);
+  }
+  
+  const mongoUri = process.env.MONGODB_URI;
+  const mongoDbName = process.env.MONGODB_DB_NAME;
+  console.log(`Server-side: MONGODB_URI is set: ${!!mongoUri}`);
+  console.log(`Server-side: MONGODB_DB_NAME is set: ${!!mongoDbName}`);
+
 
   if (dataSourceType === 'postgres') {
     const hasFullPostgresConfig = 
-      (process.env.POSTGRES_HOST && 
+      (pgHost && 
        process.env.POSTGRES_PORT && 
        process.env.POSTGRES_USER && 
        process.env.POSTGRES_PASSWORD && 
        process.env.POSTGRES_DB) || 
-      process.env.POSTGRES_CONNECTION_STRING;
+      pgConnectionString;
 
     if (!hasFullPostgresConfig) {
-      const errorMessage = "Server-side Error: dataSourceType is 'postgres', but PostgreSQL environment variables (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB) or POSTGRES_CONNECTION_STRING are not fully set. Halting.";
+      const errorMessage = "Server-side Error: dataSourceType is 'postgres', but PostgreSQL environment variables (POSTGRES_HOST, etc.) or POSTGRES_CONNECTION_STRING are not fully set. Halting application startup for this data path.";
       console.error(errorMessage);
       throw new Error(errorMessage);
     }
     try {
-      console.log("Server-side: Dynamically importing PostgresDataService...");
+      console.log("Server-side: Attempting to dynamically import PostgresDataService...");
       const { PostgresDataService } = await import('./postgres-data-service');
-      console.log("Server-side: PostgresDataService imported. Checking type.");
+      console.log("Server-side: PostgresDataService module imported.");
       if (typeof PostgresDataService !== 'function' || !PostgresDataService.prototype) {
-         console.error(`PostgresDataService is not a constructor after dynamic import. Type: ${typeof PostgresDataService}. Has prototype: ${!!(PostgresDataService as any)?.prototype}. Name: ${(PostgresDataService as any)?.name}`);
-        throw new Error(`PostgresDataService is not a constructor (type: ${typeof PostgresDataService}). Check module export or build issues.`);
+         const errorMsg = `Server-side CRITICAL: Imported PostgresDataService is not a constructor. Type: ${typeof PostgresDataService}. This usually indicates a problem with the export from postgres-data-service.ts or a build/bundling issue.`;
+         console.error(errorMsg);
+        throw new Error(errorMsg);
       }
-      console.log("Server-side: PostgresDataService appears to be a valid constructor. Instantiating...");
+      console.log("Server-side: PostgresDataService appears valid. Instantiating PostgresDataService...");
       const serviceInstance = new PostgresDataService();
       console.log("Server-side: PostgresDataService instantiated successfully.");
       return serviceInstance;
-    } catch (error) {
-      console.error("Server-side CRITICAL: Failed to dynamically import, initialize, or instantiate PostgresDataService. Error:", error);
+    } catch (error: any) {
+      console.error("Server-side CRITICAL: Failed to dynamically import or instantiate PostgresDataService. This is a fatal error for Postgres mode.", {
+        errorMessage: error.message,
+        errorStack: error.stack?.substring(0,1000) // Log more of the stack
+      });
       throw error; 
     }
   } else if (dataSourceType === 'mongodb') {
-    const hasFullMongoConfig = process.env.MONGODB_URI && process.env.MONGODB_DB_NAME;
+    const hasFullMongoConfig = mongoUri && mongoDbName;
     if (!hasFullMongoConfig) {
-      const errorMessage = "Server-side: dataSourceType is 'mongodb', but MongoDB environment variables (MONGODB_URI, MONGODB_DB_NAME) are not fully set. Halting.";
+      const errorMessage = "Server-side Error: dataSourceType is 'mongodb', but MongoDB environment variables (MONGODB_URI, MONGODB_DB_NAME) are not fully set. Halting application startup for this data path.";
       console.error(errorMessage);
       throw new Error(errorMessage);
     }
     try {
-      console.log("Server-side: Dynamically importing MongoDataService...");
+      console.log("Server-side: Attempting to dynamically import MongoDataService...");
       const { MongoDataService } = await import('./mongo-data-service');
-      console.log("Server-side: MongoDataService imported. Checking type.");
+      console.log("Server-side: MongoDataService module imported.");
        if (typeof MongoDataService !== 'function' || !MongoDataService.prototype) {
-         console.error(`MongoDataService is not a constructor after dynamic import. Type: ${typeof MongoDataService}. Has prototype: ${!!(MongoDataService as any)?.prototype}. Name: ${(MongoDataService as any)?.name}`);
-        throw new Error(`MongoDataService is not a constructor (type: ${typeof MongoDataService}). Check module export or build issues.`);
+         const errorMsg = `Server-side CRITICAL: Imported MongoDataService is not a constructor. Type: ${typeof MongoDataService}. This usually indicates a problem with the export from mongo-data-service.ts or a build/bundling issue.`;
+         console.error(errorMsg);
+        throw new Error(errorMsg);
       }
-      console.log("Server-side: MongoDataService appears to be a valid constructor. Instantiating...");
+      console.log("Server-side: MongoDataService appears valid. Instantiating MongoDataService...");
       const serviceInstance = new MongoDataService();
       console.log("Server-side: MongoDataService instantiated successfully.");
       return serviceInstance;
-    } catch (error) {
-       console.error("Server-side CRITICAL: Failed to dynamically import, initialize or instantiate MongoDataService. Original error:", error);
+    } catch (error: any) {
+       console.error("Server-side CRITICAL: Failed to dynamically import or instantiate MongoDataService. This is a fatal error for MongoDB mode.", {
+         errorMessage: error.message,
+         errorStack: error.stack?.substring(0,1000)
+       });
       throw error; 
     }
   } else { 
@@ -139,3 +164,4 @@ export {
     getCategories as getCategoriesCore, 
     getLinksByCategoryId as getLinksByCategoryIdCore 
 };
+
