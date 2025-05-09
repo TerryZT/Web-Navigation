@@ -16,4 +16,8 @@ export interface IDataService {
   addLink(link: Omit<LinkItem, 'id'>): Promise<LinkItem>;
   updateLink(updatedLink: LinkItem): Promise<LinkItem | null>;
   deleteLink(id: string): Promise<boolean>;
+
+  // Optional health check for services that require async initialization/connection verification
+  healthCheck?(): Promise<void>;
 }
+

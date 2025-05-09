@@ -24,7 +24,7 @@ const getLocalStorageItem = <T>(key: string, defaultValue: T): T => {
   if (typeof window === "undefined") {
     // For server-side rendering or build time, if this class is instantiated, return default.
     // This should not happen for write operations.
-    console.warn(`LocalDataService: Attempted to read localStorage key "${key}" on the server. Returning default.`);
+    // console.warn(`LocalDataService: Attempted to read localStorage key "${key}" on the server. Returning default.`);
     return defaultValue;
   }
   try {
@@ -38,7 +38,7 @@ const getLocalStorageItem = <T>(key: string, defaultValue: T): T => {
 
 const setLocalStorageItem = <T>(key: string, value: T): void => {
   if (typeof window === "undefined") {
-    console.warn(`LocalDataService: Attempted to write localStorage key "${key}" on the server. Operation skipped.`);
+    // console.warn(`LocalDataService: Attempted to write localStorage key "${key}" on the server. Operation skipped.`);
     return;
   }
   try {
@@ -70,7 +70,7 @@ export class LocalDataService implements IDataService {
       // This is primarily for build-time or server-side fallbacks when NEXT_PUBLIC_DATA_SOURCE_TYPE="local".
       this.categories = JSON.parse(JSON.stringify(initialCategories)); // Deep copy
       this.links = JSON.parse(JSON.stringify(initialLinks)); // Deep copy
-      console.warn("LocalDataService instantiated on the server. Data will be in-memory and reset on each request/build for 'local' mode.");
+      // console.warn("LocalDataService instantiated on the server. Data will be in-memory and reset on each request/build for 'local' mode.");
     } else {
       // Client context: use localStorage.
       // Ensure defaults are loaded if localStorage is empty.
@@ -97,6 +97,11 @@ export class LocalDataService implements IDataService {
     }
   }
 
+  async healthCheck(): Promise<void> {
+    // LocalDataService is synchronous and doesn't require an async health check.
+    // console.log("LocalDataService: Health check (no-op).");
+    return Promise.resolve();
+  }
 
   async getCategories(): Promise<Category[]> {
     if (this.isServerContext) return Promise.resolve(JSON.parse(JSON.stringify(initialCategories))); // Fresh copy for server
@@ -195,3 +200,4 @@ export class LocalDataService implements IDataService {
     return Promise.resolve(false);
   }
 }
+

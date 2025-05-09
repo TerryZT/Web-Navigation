@@ -39,24 +39,12 @@ export class PostgresDataService implements IDataService {
         throw new Error(errMsg);
       }
       
-      if (this.pool) {
-        console.log("PostgresDataService: Pool object successfully created. Attempting initial test query (async)...");
-        this.pool.query('SELECT NOW() AS now')
-          .then((result) => console.log("PostgresDataService: Initial test query successful. Current DB time:", result.rows[0].now))
-          .catch(err => {
-            console.error("PostgresDataService CRITICAL: Initial test query FAILED. This is a strong indicator of connection/config issues with the database. Subsequent queries will likely fail.", {
-              message: err.message,
-              code: err.code,
-              stack: err.stack?.substring(0, 300)
-            });
-          });
-      } else {
-         // This case should ideally not be reached if the logic above is correct, as an error should have been thrown.
+      if (!this.pool) {
          const errMsg = "PostgresDataService CRITICAL: Pool object is NULL after initialization attempt, though no error was thrown by Pool constructor. This is unexpected.";
          console.error(errMsg);
          throw new Error(errMsg);
       }
-
+      console.log("PostgresDataService: Pool object successfully created. Health check will be performed separately.");
     } catch (error: any) {
       console.error("PostgresDataService CRITICAL: Failed to initialize PostgreSQL pool during constructor. This might be due to invalid configuration format (e.g. port not a number), missing 'pg' module, or other synchronous issues.", {
         errorMessage: error.message,
@@ -67,9 +55,37 @@ export class PostgresDataService implements IDataService {
     }
   }
 
+  async healthCheck(): Promise<void> {
+    if (!this.pool) {
+      throw new Error("PostgresDataService: Pool is not initialized. Health check failed.");
+    }
+    try {
+      await this.pool.query('SELECT 1'); // Simple, fast query to check connectivity
+      console.log("PostgresDataService: Health check successful.");
+    } catch (error: any) {
+      console.error("PostgresDataService: Health check FAILED.", { 
+        errorMessage: error.message, 
+        errorCode: error.code,
+        errorStack: error.stack?.substring(0, 300)
+      });
+      // Attempt to provide more specific advice for common Vercel/Neon issues
+      if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {
+          console.error("Hint: Timeout or connection refused errors often indicate network connectivity issues (e.g., firewall, incorrect host/port) or that the database server is not running/accessible.");
+      }
+      if (error.message.includes('authentication') || (error.code && error.code.startsWith('28'))) { // 28P01 is invalid_password
+          console.error("Hint: Authentication errors (like invalid password) mean the database server is reachable, but credentials are wrong.");
+      }
+      if (error.message.includes('database') && error.message.includes('does not exist') || (error.code && error.code.startsWith('3D'))) { // 3D000 is invalid_catalog_name
+          console.error("Hint: 'Database does not exist' errors mean the server is reachable but the specified database name is incorrect or not created.");
+      }
+      throw new Error(`PostgresDataService: Health check failed. Unable to connect or query database. Original error: ${error.message}`);
+    }
+  }
+
+
   private async executeQuery<T>(queryText: string, values?: any[]): Promise<T[]> {
     const querySnippet = queryText.substring(0,150);
-    console.log(`PostgresDataService: Attempting to execute query: ${querySnippet}... Values: ${values ? JSON.stringify(values) : 'None'}`);
+    // console.log(`PostgresDataService: Attempting to execute query: ${querySnippet}... Values: ${values ? JSON.stringify(values) : 'None'}`);
     if (!this.pool) {
       console.error("PostgresDataService Error: PostgreSQL pool is not initialized. Cannot execute query. This indicates a failure during constructor or that connection details are missing/invalid.");
       throw new Error("PostgreSQL pool not initialized. Database connection failed during setup.");
@@ -77,11 +93,11 @@ export class PostgresDataService implements IDataService {
     
     let client: PoolClient | undefined;
     try {
-      console.log(`PostgresDataService: Acquiring client from pool for query: ${querySnippet}`);
+      // console.log(`PostgresDataService: Acquiring client from pool for query: ${querySnippet}`);
       client = await this.pool.connect();
-      console.log(`PostgresDataService: Client acquired. Executing query: ${querySnippet}`);
+      // console.log(`PostgresDataService: Client acquired. Executing query: ${querySnippet}`);
       const result = await client.query(queryText, values);
-      console.log(`PostgresDataService: Query executed successfully for: ${querySnippet}. Rows affected/returned: ${result.rowCount}`);
+      // console.log(`PostgresDataService: Query executed successfully for: ${querySnippet}. Rows affected/returned: ${result.rowCount}`);
       return result.rows as T[];
     } catch (error: any) {
       console.error(`PostgresDataService Error: Failed during query execution for "${querySnippet}". Values: ${values ? JSON.stringify(values) : 'None'}`, {
@@ -95,7 +111,7 @@ export class PostgresDataService implements IDataService {
     } finally {
       if (client) {
         client.release();
-        console.log(`PostgresDataService: Client released back to pool after query: ${querySnippet}`);
+        // console.log(`PostgresDataService: Client released back to pool after query: ${querySnippet}`);
       }
     }
   }
@@ -141,10 +157,10 @@ export class PostgresDataService implements IDataService {
       console.log(`PostgresDataService: Starting transaction to delete category ${id} and its links.`);
       await client.query('BEGIN');
       const deleteLinksQuery = `DELETE FROM ${LINKS_TABLE} WHERE "categoryId" = $1`;
-      console.log(`PostgresDataService: Deleting links for category ${id} with query: ${deleteLinksQuery}`);
+      // console.log(`PostgresDataService: Deleting links for category ${id} with query: ${deleteLinksQuery}`);
       await client.query(deleteLinksQuery, [id]);
       const deleteCategoryQuery = `DELETE FROM ${CATEGORIES_TABLE} WHERE id = $1`;
-      console.log(`PostgresDataService: Deleting category ${id} with query: ${deleteCategoryQuery}`);
+      // console.log(`PostgresDataService: Deleting category ${id} with query: ${deleteCategoryQuery}`);
       const result = await client.query(deleteCategoryQuery, [id]);
       await client.query('COMMIT');
       console.log(`PostgresDataService: Category ${id} and associated links deleted successfully. Rows affected for category deletion: ${result.rowCount}`);
@@ -161,7 +177,7 @@ export class PostgresDataService implements IDataService {
       throw error; 
     } finally {
       client.release();
-      console.log("PostgresDataService: Client released after deleteCategory transaction.");
+      // console.log("PostgresDataService: Client released after deleteCategory transaction.");
     }
   }
 
@@ -210,7 +226,7 @@ export class PostgresDataService implements IDataService {
     try {
         client = await this.pool.connect();
         const pgResult = await client.query(query, [id]);
-        console.log(`PostgresDataService: Link ${id} delete attempt. Rows affected: ${pgResult.rowCount}`);
+        // console.log(`PostgresDataService: Link ${id} delete attempt. Rows affected: ${pgResult.rowCount}`);
         return pgResult.rowCount !== null && pgResult.rowCount > 0;
     } catch (error: any) {
         console.error(`PostgresDataService Error: Failed during link deletion for ID "${id}":`, {
@@ -224,7 +240,7 @@ export class PostgresDataService implements IDataService {
     } finally {
         if (client) {
             client.release();
-            console.log("PostgresDataService: Client released after deleteLink operation.");
+            // console.log("PostgresDataService: Client released after deleteLink operation.");
         }
     }
   }
